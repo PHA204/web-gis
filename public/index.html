@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web GIS - Phân tích Khí hậu</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 25px;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2.2em;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 25px;
+        }
+
+        .control-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        select, input {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-title {
+            font-size: 1.4em;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        #map {
+            height: 500px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌍 Web GIS - Hệ thống Phân tích Khí hậu</h1>
+            <p class="subtitle">Phân tích dữ liệu lượng mưa và nhiệt độ từ Google Earth Engine</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <div class="form-group">
+                    <label for="location">📍 Chọn địa điểm:</label>
+                    <select id="location">
+                        <option value="">Đang tải...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dataType">📊 Loại dữ liệu:</label>
+                    <select id="dataType">
+                        <option value="rainfall">Lượng mưa</option>
+                        <option value="temperature">Nhiệt độ</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="startDate">📅 Từ ngày:</label>
+                    <input type="date" id="startDate" value="2020-01-01">
+                </div>
+
+                <div class="form-group">
+                    <label for="endDate">📅 Đến ngày:</label>
+                    <input type="date" id="endDate" value="2020-12-31">
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-primary" onclick="loadData()">🔍 Phân tích</button>
+                <button class="btn-secondary" onclick="loadMonthlyStats()">📈 Thống kê tháng</button>
+                <button class="btn-secondary" onclick="exportData()">💾 Xuất dữ liệu</button>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card full-width">
+                <h3 class="card-title">🗺️ Bản đồ khu vực</h3>
+                <div id="map"></div>
+            </div>
+
+            <div class="card full-width">
+                <h3 class="card-title">📊 Biểu đồ thời gian</h3>
+                <canvas id="timeSeriesChart"></canvas>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">📈 Thống kê tháng</h3>
+                <canvas id="monthlyChart"></canvas>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">📊 Phân bố</h3>
+                <canvas id="distributionChart"></canvas>
+            </div>
+
+            <div class="card full-width">
+                <h3 class="card-title">📋 Thống kê tổng hợp</h3>
+                <div id="statistics" class="stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalValue">--</div>
+                        <div class="stat-label">Tổng cộng</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgValue">--</div>
+                        <div class="stat-label">Trung bình</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="maxValue">--</div>
+                        <div class="stat-label">Cao nhất</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="minValue">--</div>
+                        <div class="stat-label">Thấp nhất</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        let map;
+        let charts = {};
+
+        // Khởi tạo bản đồ
+        function initMap() {
+            map = L.map('map').setView([16.8, 107.1], 9);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            L.marker([16.8, 107.1]).addTo(map)
+                .bindPopup('Quảng Trị, Việt Nam')
+                .openPopup();
+        }
+
+        // Load danh sách locations
+        async function loadLocations() {
+            try {
+                const response = await fetch(`${API_URL}/locations`);
+                const locations = await response.json();
+                
+                const select = document.getElementById('location');
+                select.innerHTML = locations.map(loc => 
+                    `<option value="${loc.id}">${loc.name}</option>`
+                ).join('');
+            } catch (error) {
+                console.error('Lỗi load locations:', error);
+            }
+        }
+
+        // Load dữ liệu
+        async function loadData() {
+            const locationId = document.getElementById('location').value;
+            const dataType = document.getElementById('dataType').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (!locationId) {
+                alert('Vui lòng chọn địa điểm');
+                return;
+            }
+
+            try {
+                const url = `${API_URL}/${dataType}?location_id=${locationId}&start=${startDate}&end=${endDate}`;
+                const response = await fetch(url);
+                const result = await response.json();
+
+                displayData(result, dataType);
+            } catch (error) {
+                console.error('Lỗi load data:', error);
+                alert('Có lỗi xảy ra khi tải dữ liệu');
+            }
+        }
+
+        // Hiển thị dữ liệu
+        function displayData(result, dataType) {
+            const { data, statistics } = result;
+
+            // Cập nhật thống kê
+            if (dataType === 'rainfall') {
+                document.getElementById('totalValue').textContent = statistics.total + ' mm';
+                document.getElementById('avgValue').textContent = statistics.average + ' mm';
+                document.getElementById('maxValue').textContent = statistics.max + ' mm';
+                document.getElementById('minValue').textContent = '0 mm';
+            } else {
+                document.getElementById('avgValue').textContent = statistics.average + '°C';
+                document.getElementById('maxValue').textContent = statistics.max + '°C';
+                document.getElementById('minValue').textContent = statistics.min + '°C';
+                document.getElementById('totalValue').textContent = statistics.days + ' ngày';
+            }
+
+            // Vẽ biểu đồ time series
+            drawTimeSeriesChart(data, dataType);
+        }
+
+        // Vẽ biểu đồ time series
+        function drawTimeSeriesChart(data, dataType) {
+            const ctx = document.getElementById('timeSeriesChart');
+            
+            if (charts.timeSeries) {
+                charts.timeSeries.destroy();
+            }
+
+            const labels = data.map(d => d.date);
+            const values = dataType === 'rainfall' 
+                ? data.map(d => d.rainfall_mm)
+                : data.map(d => d.temp_mean);
+
+            charts.timeSeries = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: dataType === 'rainfall' ? 'Lượng mưa (mm)' : 'Nhiệt độ (°C)',
+                        data: values,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load thống kê tháng
+        async function loadMonthlyStats() {
+            const locationId = document.getElementById('location').value;
+            const dataType = document.getElementById('dataType').value;
+            const year = document.getElementById('startDate').value.split('-')[0];
+
+            try {
+                const url = `${API_URL}/${dataType}/monthly?location_id=${locationId}&year=${year}`;
+                const response = await fetch(url);
+                const result = await response.json();
+
+                drawMonthlyChart(result.monthly_data, dataType);
+            } catch (error) {
+                console.error('Lỗi load monthly stats:', error);
+            }
+        }
+
+        // Vẽ biểu đồ tháng
+        function drawMonthlyChart(data, dataType) {
+            const ctx = document.getElementById('monthlyChart');
+            
+            if (charts.monthly) {
+                charts.monthly.destroy();
+            }
+
+            const labels = data.map(d => `Tháng ${d.month}`);
+            const values = dataType === 'rainfall'
+                ? data.map(d => parseFloat(d.total))
+                : data.map(d => parseFloat(d.avg_temp));
+
+            charts.monthly = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: dataType === 'rainfall' ? 'Tổng lượng mưa (mm)' : 'Nhiệt độ TB (°C)',
+                        data: values,
+                        backgroundColor: 'rgba(102, 126, 234, 0.7)',
+                        borderColor: '#667eea',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true
+                }
+            });
+        }
+
+        // Xuất dữ liệu
+        function exportData() {
+            alert('Tính năng xuất dữ liệu đang được phát triển!');
+        }
+
+        // Khởi tạo
+        window.onload = function() {
+            initMap();
+            loadLocations();
+        };
+    </script>
+</body>
+</html>
