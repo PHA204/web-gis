@@ -19,6 +19,7 @@ import { smRouter } from "./routes/soilMoisture.routes.js";
 import { ndviRouter } from "./routes/ndvi.routes.js";
 import { tvdiRouter } from "./routes/tvdi.routes.js";
 import { dashboardRouter } from "./routes/dashboard.routes.js";
+import geeRoutes from "./routes/gee.routes.js";
 
 // API Routes
 app.use("/api/rainfall", rainfallRoutes);
@@ -28,6 +29,7 @@ app.use("/api/soil-moisture", smRouter);
 app.use("/api/ndvi", ndviRouter);
 app.use("/api/tvdi", tvdiRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/gee", geeRoutes);
 
 // Health check
 app.get("/api", (req, res) => {
