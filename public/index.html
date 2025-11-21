@@ -3,475 +3,477 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web GIS - Phân tích Khí hậu</title>
+    <title>Web GIS - Phân tích Khí hậu & Hạn hán</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
+            color: #fff;
         }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
+        .container { max-width: 1600px; margin: 0 auto; padding: 15px; }
+        
         header {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 25px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px 25px;
             border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            margin-bottom: 25px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
         }
-
-        h1 {
-            color: #667eea;
-            font-size: 2.2em;
-            margin-bottom: 5px;
-        }
-
-        .subtitle {
-            color: #666;
-            font-size: 1.1em;
-        }
+        h1 { font-size: 1.8em; background: linear-gradient(90deg, #00d9ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { color: rgba(255,255,255,0.7); margin-top: 5px; }
 
         .controls {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 25px;
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
             border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            margin-bottom: 25px;
-        }
-
-        .control-group {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
             margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
         }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 8px;
+        .control-row { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; min-width: 150px; }
+        .form-group label { font-size: 0.85em; color: rgba(255,255,255,0.7); margin-bottom: 5px; }
+        select, input {
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
             font-size: 0.95em;
         }
-
-        select, input {
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1em;
-            transition: all 0.3s;
-        }
-
-        select:focus, input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
+        select option { background: #1a1a2e; color: #fff; }
         button {
-            padding: 12px 24px;
+            padding: 10px 20px;
             border: none;
             border-radius: 8px;
-            font-size: 1em;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
         }
+        .btn-primary { background: linear-gradient(135deg, #00d9ff, #00ff88); color: #1a1a2e; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,217,255,0.4); }
 
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-secondary {
-            background: #f5f5f5;
-            color: #333;
-        }
-
-        .btn-secondary:hover {
-            background: #e0e0e0;
-        }
-
-        .dashboard {
+        /* Stats Cards */
+        .stats-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 25px;
-            margin-bottom: 25px;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
         }
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+            transition: transform 0.3s;
+        }
+        .stat-card:hover { transform: translateY(-3px); }
+        .stat-icon { font-size: 2em; margin-bottom: 10px; }
+        .stat-value { font-size: 1.8em; font-weight: bold; margin-bottom: 5px; }
+        .stat-label { font-size: 0.85em; color: rgba(255,255,255,0.6); }
+        .stat-sub { font-size: 0.75em; color: rgba(255,255,255,0.5); margin-top: 5px; }
+        
+        .rainfall { border-left: 4px solid #00d9ff; }
+        .temperature { border-left: 4px solid #ff6b6b; }
+        .soil { border-left: 4px solid #ffd93d; }
+        .ndvi { border-left: 4px solid #6bcb77; }
+        .tvdi { border-left: 4px solid #ff8c42; }
 
+        /* Dashboard Grid */
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .card {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 25px;
+            background: rgba(255,255,255,0.05);
             border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
         }
-
         .card-title {
-            font-size: 1.4em;
-            color: #333;
+            font-size: 1.1em;
             margin-bottom: 15px;
             padding-bottom: 10px;
-            border-bottom: 3px solid #667eea;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
+        .full-width { grid-column: 1 / -1; }
+        
+        #map { height: 400px; border-radius: 10px; }
+        canvas { max-height: 300px; }
 
-        #map {
-            height: 500px;
+        /* Drought Alert */
+        .drought-alert {
+            background: linear-gradient(135deg, rgba(255,140,66,0.2), rgba(255,107,107,0.2));
+            border: 1px solid #ff8c42;
             border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .full-width {
-            grid-column: 1 / -1;
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 2em;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            font-size: 0.9em;
-            opacity: 0.9;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #667eea;
-            font-size: 1.2em;
-        }
-
-        .error {
-            background: #fee;
-            color: #c33;
             padding: 15px;
-            border-radius: 8px;
-            margin-top: 10px;
+            margin-top: 15px;
         }
+        .alert-title { font-weight: bold; color: #ff8c42; margin-bottom: 10px; }
+        .drought-level {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        .level-wet { background: #2166ac; }
+        .level-normal { background: #67a9cf; }
+        .level-moderate { background: #fddbc7; color: #333; }
+        .level-severe { background: #ef8a62; }
+        .level-extreme { background: #b2182b; }
 
+        /* Legend */
+        .legend { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.85em; }
+        .legend-color { width: 15px; height: 15px; border-radius: 3px; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 5px; margin-bottom: 15px; }
+        .tab {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 8px;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .tab.active { background: linear-gradient(135deg, #00d9ff, #00ff88); color: #1a1a2e; }
+
+        @media (max-width: 1200px) {
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+        }
         @media (max-width: 768px) {
-            .dashboard {
-                grid-template-columns: 1fr;
-            }
-            
-            h1 {
-                font-size: 1.5em;
-            }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .dashboard { grid-template-columns: 1fr; }
+            .control-row { flex-direction: column; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🌍 Web GIS - Hệ thống Phân tích Khí hậu</h1>
-            <p class="subtitle">Phân tích dữ liệu lượng mưa và nhiệt độ từ Google Earth Engine</p>
+            <h1>🌍 Web GIS - Hệ thống Giám sát Khí hậu & Hạn hán</h1>
+            <p class="subtitle">Phân tích dữ liệu: Lượng mưa | Nhiệt độ | Độ ẩm đất | NDVI | TVDI</p>
         </header>
 
         <div class="controls">
-            <div class="control-group">
+            <div class="control-row">
                 <div class="form-group">
-                    <label for="location">📍 Chọn địa điểm:</label>
-                    <select id="location">
-                        <option value="">Đang tải...</option>
-                    </select>
+                    <label>📍 Địa điểm</label>
+                    <select id="location"><option value="1">Quảng Trị</option></select>
                 </div>
-
                 <div class="form-group">
-                    <label for="dataType">📊 Loại dữ liệu:</label>
-                    <select id="dataType">
-                        <option value="rainfall">Lượng mưa</option>
-                        <option value="temperature">Nhiệt độ</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="startDate">📅 Từ ngày:</label>
+                    <label>📅 Từ ngày</label>
                     <input type="date" id="startDate" value="2020-01-01">
                 </div>
-
                 <div class="form-group">
-                    <label for="endDate">📅 Đến ngày:</label>
+                    <label>📅 Đến ngày</label>
                     <input type="date" id="endDate" value="2020-12-31">
                 </div>
-            </div>
-
-            <div class="btn-group">
-                <button class="btn-primary" onclick="loadData()">🔍 Phân tích</button>
-                <button class="btn-secondary" onclick="loadMonthlyStats()">📈 Thống kê tháng</button>
-                <button class="btn-secondary" onclick="exportData()">💾 Xuất dữ liệu</button>
+                <button class="btn-primary" onclick="loadAllData()">🔍 Phân tích</button>
             </div>
         </div>
 
-        <div class="">
-            <div class="">                
-                <div id="map" style="display: none;"></div>
-
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card rainfall">
+                <div class="stat-icon">🌧️</div>
+                <div class="stat-value" id="rainTotal">--</div>
+                <div class="stat-label">Tổng lượng mưa (mm)</div>
+                <div class="stat-sub" id="rainAvg">TB: -- mm/ngày</div>
             </div>
-             <div class="card full-width">
-                <h3 class="card-title">📋 Thống kê tổng hợp</h3>
-                <div id="statistics" class="stats">
-                    <div class="stat-card">
-                        <div class="stat-value" id="totalValue">--</div>
-                        <div class="stat-label">Tổng cộng</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="avgValue">--</div>
-                        <div class="stat-label">Trung bình</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="maxValue">--</div>
-                        <div class="stat-label">Cao nhất</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="minValue">--</div>
-                        <div class="stat-label">Thấp nhất</div>
+            <div class="stat-card temperature">
+                <div class="stat-icon">🌡️</div>
+                <div class="stat-value" id="tempAvg">--°C</div>
+                <div class="stat-label">Nhiệt độ TB</div>
+                <div class="stat-sub" id="tempRange">Min: -- | Max: --</div>
+            </div>
+            <div class="stat-card soil">
+                <div class="stat-icon">💧</div>
+                <div class="stat-value" id="smValue">--</div>
+                <div class="stat-label">Độ ẩm đất (m³/m³)</div>
+                <div class="stat-sub" id="smClass">--</div>
+            </div>
+            <div class="stat-card ndvi">
+                <div class="stat-icon">🌿</div>
+                <div class="stat-value" id="ndviValue">--</div>
+                <div class="stat-label">NDVI TB</div>
+                <div class="stat-sub" id="vegPct">Thực vật: --%</div>
+            </div>
+            <div class="stat-card tvdi">
+                <div class="stat-icon">🔥</div>
+                <div class="stat-value" id="tvdiValue">--</div>
+                <div class="stat-label">TVDI TB</div>
+                <div class="stat-sub" id="droughtDays">Ngày hạn nặng: --</div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <!-- Map -->
+            <div class="card">
+                <h3 class="card-title">🗺️ Bản đồ khu vực</h3>
+                <div id="map"></div>
+            </div>
+
+            <!-- Drought Status -->
+            <div class="card">
+                <h3 class="card-title">⚠️ Tình trạng hạn hán</h3>
+                <div id="droughtStatus">
+                    <div style="text-align:center; padding: 30px;">
+                        <div style="font-size: 4em; margin-bottom: 15px;">📊</div>
+                        <p>Nhấn "Phân tích" để xem tình trạng</p>
                     </div>
                 </div>
             </div>
+
+            <!-- Time Series Chart -->
             <div class="card full-width">
-                <h3 class="card-title">📊 Biểu đồ thời gian</h3>
-                <canvas id="timeSeriesChart"></canvas>
+                <h3 class="card-title">📈 Biểu đồ theo thời gian</h3>
+                <div class="tabs">
+                    <button class="tab active" onclick="switchChart('rainfall')">Lượng mưa</button>
+                    <button class="tab" onclick="switchChart('temperature')">Nhiệt độ</button>
+                    <button class="tab" onclick="switchChart('soil')">Độ ẩm đất</button>
+                    <button class="tab" onclick="switchChart('ndvi')">NDVI</button>
+                    <button class="tab" onclick="switchChart('tvdi')">TVDI</button>
+                </div>
+                <canvas id="mainChart"></canvas>
             </div>
 
+            <!-- Monthly Stats -->
             <div class="card">
-                <h3 class="card-title">📈 Thống kê tháng</h3>
-                <canvas id="monthlyChart"></canvas>
+                <h3 class="card-title">📊 Thống kê theo tháng - NDVI</h3>
+                <canvas id="ndviMonthlyChart"></canvas>
             </div>
 
+            <!-- TVDI Monthly -->
             <div class="card">
-                <h3 class="card-title">📊 Phân bố</h3>
-                <canvas id="distributionChart"></canvas>
+                <h3 class="card-title">📊 Thống kê theo tháng - TVDI</h3>
+                <canvas id="tvdiMonthlyChart"></canvas>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-color" style="background:#2166ac"></div>Ẩm</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#67a9cf"></div>Bình thường</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#fddbc7"></div>Hạn nhẹ</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#ef8a62"></div>Hạn nặng</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#b2182b"></div>Hạn cực đoan</div>
+                </div>
             </div>
-
-           
         </div>
     </div>
 
     <script>
-        const API_URL = 'http://localhost:3000/api';
-        let map;
-        let charts = {};
+        const API = 'http://localhost:3000/api';
+        let map, charts = {}, allData = {};
 
-        // Khởi tạo bản đồ
+        // Init Map
         function initMap() {
-            map = L.map('map').setView([16.8, 107.1], 9);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
-            
-            L.marker([16.8, 107.1]).addTo(map)
-                .bindPopup('Quảng Trị, Việt Nam')
-                .openPopup();
+            map = L.map('map').setView([16.75, 107.0], 9);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            L.marker([16.75, 107.0]).addTo(map).bindPopup('Quảng Trị').openPopup();
         }
 
-        // Load danh sách locations
-        async function loadLocations() {
+        // Load all data
+        async function loadAllData() {
+            const locId = document.getElementById('location').value;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const year = start.split('-')[0];
+
             try {
-                const response = await fetch(`${API_URL}/locations`);
-                const locations = await response.json();
+                const [overview, rainfall, temp, sm, ndvi, tvdi, ndviM, tvdiM] = await Promise.all([
+                    fetch(`${API}/dashboard/overview?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/rainfall?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/temperature?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/soil-moisture?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/ndvi?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/tvdi?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/ndvi/monthly?location_id=${locId}&year=${year}`).then(r=>r.json()),
+                    fetch(`${API}/tvdi/monthly?location_id=${locId}&year=${year}`).then(r=>r.json())
+                ]);
+
+                allData = { rainfall, temp, sm, ndvi, tvdi };
                 
-                const select = document.getElementById('location');
-                select.innerHTML = locations.map(loc => 
-                    `<option value="${loc.id}">${loc.name}</option>`
-                ).join('');
-            } catch (error) {
-                console.error('Lỗi load locations:', error);
+                // Update stats
+                document.getElementById('rainTotal').textContent = overview.rainfall.total;
+                document.getElementById('rainAvg').textContent = `TB: ${overview.rainfall.average} mm/ngày`;
+                document.getElementById('tempAvg').textContent = overview.temperature.average + '°C';
+                document.getElementById('tempRange').textContent = `Min: ${overview.temperature.min}° | Max: ${overview.temperature.max}°`;
+                document.getElementById('smValue').textContent = overview.soil_moisture.surface;
+                document.getElementById('ndviValue').textContent = overview.ndvi.average;
+                document.getElementById('vegPct').textContent = `Thực vật: ${overview.ndvi.vegetation_pct}%`;
+                document.getElementById('tvdiValue').textContent = overview.tvdi.average;
+                document.getElementById('droughtDays').textContent = `Ngày hạn nặng: ${overview.tvdi.drought_days}`;
+
+                // Drought status
+                updateDroughtStatus(tvdi.statistics);
+                
+                // Charts
+                drawMainChart('rainfall', rainfall.data);
+                drawNdviMonthlyChart(ndviM.monthly_data);
+                drawTvdiMonthlyChart(tvdiM.monthly_data);
+
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Lỗi khi tải dữ liệu. Kiểm tra API server.');
             }
         }
 
-        // Load dữ liệu
-        async function loadData() {
-            const locationId = document.getElementById('location').value;
-            const dataType = document.getElementById('dataType').value;
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-
-            if (!locationId) {
-                alert('Vui lòng chọn địa điểm');
-                return;
-            }
-
-            try {
-                const url = `${API_URL}/${dataType}?location_id=${locationId}&start=${startDate}&end=${endDate}`;
-                const response = await fetch(url);
-                const result = await response.json();
-
-                displayData(result, dataType);
-            } catch (error) {
-                console.error('Lỗi load data:', error);
-                alert('Có lỗi xảy ra khi tải dữ liệu');
-            }
-        }
-
-        // Hiển thị dữ liệu
-        function displayData(result, dataType) {
-            const { data, statistics } = result;
-
-            // Cập nhật thống kê
-            if (dataType === 'rainfall') {
-                document.getElementById('totalValue').textContent = statistics.total + ' mm';
-                document.getElementById('avgValue').textContent = statistics.average + ' mm';
-                document.getElementById('maxValue').textContent = statistics.max + ' mm';
-                document.getElementById('minValue').textContent = '0 mm';
-            } else {
-                document.getElementById('avgValue').textContent = statistics.average + '°C';
-                document.getElementById('maxValue').textContent = statistics.max + '°C';
-                document.getElementById('minValue').textContent = statistics.min + '°C';
-                document.getElementById('totalValue').textContent = statistics.days + ' ngày';
-            }
-
-            // Vẽ biểu đồ time series
-            drawTimeSeriesChart(data, dataType);
-        }
-
-        // Vẽ biểu đồ time series
-        function drawTimeSeriesChart(data, dataType) {
-            const ctx = document.getElementById('timeSeriesChart');
+        function updateDroughtStatus(stats) {
+            const tvdi = parseFloat(stats.average);
+            let level, levelClass, desc;
             
-            if (charts.timeSeries) {
-                charts.timeSeries.destroy();
-            }
+            if (tvdi < 0.2) { level = 'ẨM ƯỚT'; levelClass = 'level-wet'; desc = 'Điều kiện ẩm ướt, không có nguy cơ hạn.'; }
+            else if (tvdi < 0.4) { level = 'BÌNH THƯỜNG'; levelClass = 'level-normal'; desc = 'Điều kiện bình thường.'; }
+            else if (tvdi < 0.6) { level = 'HẠN NHẸ'; levelClass = 'level-moderate'; desc = 'Cần theo dõi, có thể ảnh hưởng cây trồng.'; }
+            else if (tvdi < 0.8) { level = 'HẠN NẶNG'; levelClass = 'level-severe'; desc = 'Cần biện pháp ứng phó, ảnh hưởng nghiêm trọng.'; }
+            else { level = 'HẠN CỰC ĐOAN'; levelClass = 'level-extreme'; desc = 'Tình trạng khẩn cấp, thiệt hại lớn.'; }
 
-            const labels = data.map(d => d.date);
-            const values = dataType === 'rainfall' 
-                ? data.map(d => d.rainfall_mm)
-                : data.map(d => d.temp_mean);
+            document.getElementById('droughtStatus').innerHTML = `
+                <div style="text-align:center">
+                    <div class="drought-level ${levelClass}">${level}</div>
+                    <p style="margin-top:15px; color:rgba(255,255,255,0.8)">${desc}</p>
+                    <div class="drought-alert">
+                        <div class="alert-title">📊 Thống kê chi tiết</div>
+                        <p>TVDI trung bình: <strong>${stats.average}</strong></p>
+                        <p>Diện tích hạn TB: <strong>${stats.drought_pct}%</strong></p>
+                        <p>Số ngày hạn nặng/cực đoan: <strong>${stats.drought_days}</strong></p>
+                    </div>
+                </div>
+            `;
+        }
 
-            charts.timeSeries = new Chart(ctx, {
-                type: 'line',
+        function drawMainChart(type, data) {
+            const ctx = document.getElementById('mainChart');
+            if (charts.main) charts.main.destroy();
+
+            const config = {
+                rainfall: { label: 'Lượng mưa (mm)', color: '#00d9ff', field: 'rainfall_mm' },
+                temperature: { label: 'Nhiệt độ (°C)', color: '#ff6b6b', field: 'temp_mean' },
+                soil: { label: 'Độ ẩm đất', color: '#ffd93d', field: 'sm_surface' },
+                ndvi: { label: 'NDVI', color: '#6bcb77', field: 'ndvi_mean' },
+                tvdi: { label: 'TVDI', color: '#ff8c42', field: 'tvdi_mean' }
+            };
+
+            const c = config[type];
+            charts.main = new Chart(ctx, {
+                type: type === 'rainfall' ? 'bar' : 'line',
                 data: {
-                    labels: labels,
+                    labels: data.map(d => d.date),
                     datasets: [{
-                        label: dataType === 'rainfall' ? 'Lượng mưa (mm)' : 'Nhiệt độ (°C)',
-                        data: values,
-                        borderColor: '#667eea',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                        tension: 0.4,
-                        fill: true
+                        label: c.label,
+                        data: data.map(d => d[c.field]),
+                        borderColor: c.color,
+                        backgroundColor: type === 'rainfall' ? c.color : c.color + '20',
+                        fill: type !== 'rainfall',
+                        tension: 0.4
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        }
-                    },
+                    plugins: { legend: { labels: { color: '#fff' } } },
                     scales: {
-                        y: {
-                            beginAtZero: true
-                        }
+                        x: { ticks: { color: '#999', maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#999' }, grid: { color: 'rgba(255,255,255,0.1)' }, beginAtZero: true }
                     }
                 }
             });
         }
 
-        // Load thống kê tháng
-        async function loadMonthlyStats() {
-            const locationId = document.getElementById('location').value;
-            const dataType = document.getElementById('dataType').value;
-            const year = document.getElementById('startDate').value.split('-')[0];
-
-            try {
-                const url = `${API_URL}/${dataType}/monthly?location_id=${locationId}&year=${year}`;
-                const response = await fetch(url);
-                const result = await response.json();
-
-                drawMonthlyChart(result.monthly_data, dataType);
-            } catch (error) {
-                console.error('Lỗi load monthly stats:', error);
-            }
+        function switchChart(type) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const dataMap = {
+                rainfall: allData.rainfall?.data,
+                temperature: allData.temp?.data,
+                soil: allData.sm?.data,
+                ndvi: allData.ndvi?.data,
+                tvdi: allData.tvdi?.data
+            };
+            if (dataMap[type]) drawMainChart(type, dataMap[type]);
         }
 
-        // Vẽ biểu đồ tháng
-        function drawMonthlyChart(data, dataType) {
-            const ctx = document.getElementById('monthlyChart');
-            
-            if (charts.monthly) {
-                charts.monthly.destroy();
-            }
+        function drawNdviMonthlyChart(data) {
+            const ctx = document.getElementById('ndviMonthlyChart');
+            if (charts.ndviM) charts.ndviM.destroy();
 
-            const labels = data.map(d => `Tháng ${d.month}`);
-            const values = dataType === 'rainfall'
-                ? data.map(d => parseFloat(d.total))
-                : data.map(d => parseFloat(d.avg_temp));
-
-            charts.monthly = new Chart(ctx, {
+            charts.ndviM = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: labels,
+                    labels: data.map(d => `T${d.month}`),
                     datasets: [{
-                        label: dataType === 'rainfall' ? 'Tổng lượng mưa (mm)' : 'Nhiệt độ TB (°C)',
-                        data: values,
-                        backgroundColor: 'rgba(102, 126, 234, 0.7)',
-                        borderColor: '#667eea',
-                        borderWidth: 2
+                        label: 'NDVI TB',
+                        data: data.map(d => d.avg_ndvi),
+                        backgroundColor: data.map(d => {
+                            const v = parseFloat(d.avg_ndvi);
+                            if (v < 0.2) return '#ca0020';
+                            if (v < 0.4) return '#f4a582';
+                            if (v < 0.6) return '#92c5de';
+                            return '#4dac26';
+                        })
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#999' }, grid: { display: false } },
+                        y: { ticks: { color: '#999' }, grid: { color: 'rgba(255,255,255,0.1)' }, min: 0, max: 1 }
+                    }
                 }
             });
         }
 
-        // Xuất dữ liệu
-        function exportData() {
-            alert('Tính năng xuất dữ liệu đang được phát triển!');
+        function drawTvdiMonthlyChart(data) {
+            const ctx = document.getElementById('tvdiMonthlyChart');
+            if (charts.tvdiM) charts.tvdiM.destroy();
+
+            charts.tvdiM = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => `T${d.month}`),
+                    datasets: [{
+                        label: 'TVDI TB',
+                        data: data.map(d => d.avg_tvdi),
+                        backgroundColor: data.map(d => {
+                            const v = parseFloat(d.avg_tvdi);
+                            if (v < 0.2) return '#2166ac';
+                            if (v < 0.4) return '#67a9cf';
+                            if (v < 0.6) return '#fddbc7';
+                            if (v < 0.8) return '#ef8a62';
+                            return '#b2182b';
+                        })
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#999' }, grid: { display: false } },
+                        y: { ticks: { color: '#999' }, grid: { color: 'rgba(255,255,255,0.1)' }, min: 0, max: 1 }
+                    }
+                }
+            });
         }
 
-        // Khởi tạo
-        window.onload = function() {
-            initMap();
-            loadLocations();
-        };
+        // Load locations
+        async function loadLocations() {
+            try {
+                const res = await fetch(`${API}/locations`);
+                const data = await res.json();
+                const sel = document.getElementById('location');
+                sel.innerHTML = data.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+            } catch (e) { console.log('Using default location'); }
+        }
+
+        window.onload = () => { initMap(); loadLocations(); };
     </script>
 </body>
 </html>
