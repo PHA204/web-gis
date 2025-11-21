@@ -57,4 +57,3 @@ smRouter.get("/monthly", async (req, res) => {
 });
 
 export { smRouter };
-

@@ -1,6 +1,7 @@
 // ============================================
 // routes/ndvi.routes.js
 // ============================================
+import express from "express";
 import NdviModel from "../models/ndvi.model.js";
 
 const ndviRouter = express.Router();

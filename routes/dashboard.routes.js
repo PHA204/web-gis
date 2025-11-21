@@ -1,7 +1,7 @@
-
 // ============================================
 // routes/dashboard.routes.js - Tổng hợp
 // ============================================
+import express from "express";
 import pool from "../config/db.js";
 
 const dashboardRouter = express.Router();

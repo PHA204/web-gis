@@ -1,15 +1,19 @@
 """
-get_gee_data.py - Script lấy dữ liệu từ Google Earth Engine
-Bao gồm: Lượng mưa, Nhiệt độ, Độ ẩm đất, NDVI, TVDI
+api_server.py - Flask API Server để nhận request từ UI và tải dữ liệu GEE
 """
 
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import ee
 import pandas as pd
 import psycopg2
-from datetime import datetime, timedelta
-import numpy as np
+from datetime import datetime
+import threading
 
-# ================== CẤU HÌNH ==================
+app = Flask(__name__)
+CORS(app)
+
+# Database config
 DB_CONFIG = {
     'dbname': 'web_gis',
     'user': 'postgres',
@@ -18,51 +22,34 @@ DB_CONFIG = {
     'port': 5432
 }
 
-PROVINCE = "Quang Tri"
-LOCATION_ID = 1
-START_DATE = "2020-01-01"
-END_DATE = "2020-1-31"
-
-# ===============================================
-
+# Initialize GEE
 def initialize_gee():
-    """Khởi tạo Google Earth Engine"""
     try:
+        ee.Initialize()
+        return True
+    except:
         try:
-            ee.Initialize()
-            print("✅ Đã kết nối GEE thành công! (No project)")
-            return True
-        except:
             ee.Initialize(project='where-earthengine')
-            print("✅ Đã kết nối GEE thành công! (With project)")
             return True
-    except Exception as e:
-        print(f"❌ Lỗi khi khởi tạo GEE: {e}")
-        print("\n🔧 Chạy: earthengine authenticate")
-        return False
+        except Exception as e:
+            print(f"❌ GEE Error: {e}")
+            return False
 
+# Get region geometry
 def get_region_geometry(province_name):
-    """Lấy geometry của tỉnh từ GADM"""
     try:
         gadm = ee.FeatureCollection("FAO/GAUL/2015/level1")
         region = gadm.filter(ee.Filter.eq('ADM1_NAME', province_name))
-        
         count = region.size().getInfo()
         if count == 0:
-            print(f"⚠️ Không tìm thấy '{province_name}'")
             return None
-        
-        print(f"✅ Đã tìm thấy khu vực: {province_name}")
         return region.geometry()
     except Exception as e:
-        print(f"❌ Lỗi khi lấy geometry: {e}")
+        print(f"Error: {e}")
         return None
 
-# ==================== RAINFALL ====================
+# RAINFALL
 def get_rainfall_data(geometry, start_date, end_date, location_id):
-    """Lấy dữ liệu lượng mưa từ CHIRPS"""
-    print(f"\n🌧️ Đang lấy dữ liệu LƯỢNG MƯA...")
-    
     try:
         collection = (
             ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
@@ -71,8 +58,6 @@ def get_rainfall_data(geometry, start_date, end_date, location_id):
         )
         
         size = collection.size().getInfo()
-        print(f"   Tìm thấy {size} ngày dữ liệu")
-        
         if size == 0:
             return pd.DataFrame()
         
@@ -94,29 +79,14 @@ def get_rainfall_data(geometry, start_date, end_date, location_id):
             }
         
         images = collection.toList(size)
-        data = []
-        
-        for i in range(size):
-            try:
-                result = extract(ee.Image(images.get(i)))
-                data.append(result)
-                if (i + 1) % 30 == 0:
-                    print(f"   ⏳ {i + 1}/{size} ({((i+1)/size*100):.1f}%)")
-            except Exception as e:
-                print(f"   ⚠️ Lỗi ngày {i}: {e}")
-        
-        print(f"✅ Hoàn thành! {len(data)} bản ghi")
+        data = [extract(ee.Image(images.get(i))) for i in range(size)]
         return pd.DataFrame(data)
-        
     except Exception as e:
-        print(f"❌ Lỗi: {e}")
+        print(f"Rainfall error: {e}")
         return pd.DataFrame()
 
-# ==================== TEMPERATURE ====================
+# TEMPERATURE
 def get_temperature_data(geometry, start_date, end_date, location_id):
-    """Lấy dữ liệu nhiệt độ từ ERA5"""
-    print(f"\n🌡️ Đang lấy dữ liệu NHIỆT ĐỘ...")
-    
     try:
         collection = (
             ee.ImageCollection("ECMWF/ERA5/DAILY")
@@ -127,8 +97,6 @@ def get_temperature_data(geometry, start_date, end_date, location_id):
         )
         
         size = collection.size().getInfo()
-        print(f"   Tìm thấy {size} ngày dữ liệu")
-        
         if size == 0:
             return pd.DataFrame()
         
@@ -155,68 +123,29 @@ def get_temperature_data(geometry, start_date, end_date, location_id):
             }
         
         images = collection.toList(size)
-        data = []
-        
-        for i in range(size):
-            try:
-                result = extract(ee.Image(images.get(i)))
-                data.append(result)
-                if (i + 1) % 30 == 0:
-                    print(f"   ⏳ {i + 1}/{size} ({((i+1)/size*100):.1f}%)")
-            except Exception as e:
-                print(f"   ⚠️ Lỗi ngày {i}: {e}")
-        
-        print(f"✅ Hoàn thành! {len(data)} bản ghi")
+        data = [extract(ee.Image(images.get(i))) for i in range(size)]
         return pd.DataFrame(data)
-        
     except Exception as e:
-        print(f"❌ Lỗi: {e}")
+        print(f"Temperature error: {e}")
         return pd.DataFrame()
 
-# ==================== SOIL MOISTURE ====================
+# SOIL MOISTURE
 def get_soil_moisture_data(geometry, start_date, end_date, location_id):
-    """Lấy dữ liệu độ ẩm đất từ NASA SMAP hoặc ERA5-Land"""
-    print(f"\n💧 Đang lấy dữ liệu ĐỘ ẨM ĐẤT...")
-    
     try:
-        # Sử dụng ERA5-Land cho độ ẩm đất (có sẵn và ổn định hơn)
         collection = (
             ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
             .filterBounds(geometry)
             .filterDate(start_date, end_date)
             .select([
-                'volumetric_soil_water_layer_1',  # 0-7cm
-                'volumetric_soil_water_layer_2',  # 7-28cm
-                'volumetric_soil_water_layer_3',  # 28-100cm
-                'volumetric_soil_water_layer_4'   # 100-289cm
+                'volumetric_soil_water_layer_1',
+                'volumetric_soil_water_layer_2',
+                'volumetric_soil_water_layer_3'
             ])
         )
         
         size = collection.size().getInfo()
-        print(f"   Tìm thấy {size} ngày dữ liệu (ERA5-Land)")
-        
         if size == 0:
-            # Fallback to SMAP
-            print("   Thử NASA SMAP...")
-            collection = (
-                ee.ImageCollection("NASA/SMAP/SPL4SMGP/007")
-                .filterBounds(geometry)
-                .filterDate(start_date, end_date)
-                .select(['sm_surface', 'sm_rootzone', 'sm_profile'])
-            )
-            size = collection.size().getInfo()
-            print(f"   Tìm thấy {size} ngày dữ liệu (SMAP)")
-            
-            if size == 0:
-                return pd.DataFrame()
-            
-            source = 'SMAP'
-            bands = ['sm_surface', 'sm_rootzone', 'sm_profile']
-        else:
-            source = 'ERA5-Land'
-            bands = ['volumetric_soil_water_layer_1', 
-                     'volumetric_soil_water_layer_2', 
-                     'volumetric_soil_water_layer_3']
+            return pd.DataFrame()
         
         def extract(img):
             date = ee.Date(img.get('system:time_start')).format('YYYY-MM-dd').getInfo()
@@ -227,14 +156,9 @@ def get_soil_moisture_data(geometry, start_date, end_date, location_id):
                 maxPixels=1e13
             )
             
-            if source == 'SMAP':
-                sm_surf = stats.get('sm_surface')
-                sm_root = stats.get('sm_rootzone')
-                sm_prof = stats.get('sm_profile')
-            else:
-                sm_surf = stats.get('volumetric_soil_water_layer_1')
-                sm_root = stats.get('volumetric_soil_water_layer_2')
-                sm_prof = stats.get('volumetric_soil_water_layer_3')
+            sm_surf = stats.get('volumetric_soil_water_layer_1')
+            sm_root = stats.get('volumetric_soil_water_layer_2')
+            sm_prof = stats.get('volumetric_soil_water_layer_3')
             
             return {
                 'location_id': location_id,
@@ -242,52 +166,32 @@ def get_soil_moisture_data(geometry, start_date, end_date, location_id):
                 'sm_surface': round(sm_surf.getInfo(), 4) if sm_surf else None,
                 'sm_rootzone': round(sm_root.getInfo(), 4) if sm_root else None,
                 'sm_profile': round(sm_prof.getInfo(), 4) if sm_prof else None,
-                'source': source
+                'source': 'ERA5-Land'
             }
         
         images = collection.toList(size)
-        data = []
-        
-        for i in range(size):
-            try:
-                result = extract(ee.Image(images.get(i)))
-                data.append(result)
-                if (i + 1) % 30 == 0:
-                    print(f"   ⏳ {i + 1}/{size} ({((i+1)/size*100):.1f}%)")
-            except Exception as e:
-                print(f"   ⚠️ Lỗi ngày {i}: {e}")
-        
-        print(f"✅ Hoàn thành! {len(data)} bản ghi")
+        data = [extract(ee.Image(images.get(i))) for i in range(size)]
         return pd.DataFrame(data)
-        
     except Exception as e:
-        print(f"❌ Lỗi: {e}")
+        print(f"Soil moisture error: {e}")
         return pd.DataFrame()
 
-# ==================== NDVI ====================
+# NDVI
 def get_ndvi_data(geometry, start_date, end_date, location_id):
-    """Lấy dữ liệu NDVI từ MODIS"""
-    print(f"\n🌿 Đang lấy dữ liệu NDVI...")
-    
     try:
-        # MODIS NDVI 16-day composite
         collection = (
             ee.ImageCollection("MODIS/061/MOD13Q1")
             .filterBounds(geometry)
             .filterDate(start_date, end_date)
-            .select(['NDVI', 'EVI'])
+            .select(['NDVI'])
         )
         
         size = collection.size().getInfo()
-        print(f"   Tìm thấy {size} ảnh (16-day composite)")
-        
         if size == 0:
             return pd.DataFrame()
         
         def extract(img):
             date = ee.Date(img.get('system:time_start')).format('YYYY-MM-dd').getInfo()
-            
-            # MODIS NDVI scale factor = 0.0001
             ndvi_img = img.select('NDVI').multiply(0.0001)
             
             stats = ndvi_img.reduceRegion(
@@ -300,7 +204,6 @@ def get_ndvi_data(geometry, start_date, end_date, location_id):
                 maxPixels=1e13
             )
             
-            # Tính % diện tích có thực vật (NDVI > 0.2)
             veg_mask = ndvi_img.gt(0.2)
             veg_area = veg_mask.reduceRegion(
                 reducer=ee.Reducer.mean(),
@@ -326,36 +229,15 @@ def get_ndvi_data(geometry, start_date, end_date, location_id):
             }
         
         images = collection.toList(size)
-        data = []
-        
-        for i in range(size):
-            try:
-                result = extract(ee.Image(images.get(i)))
-                data.append(result)
-                if (i + 1) % 10 == 0:
-                    print(f"   ⏳ {i + 1}/{size} ({((i+1)/size*100):.1f}%)")
-            except Exception as e:
-                print(f"   ⚠️ Lỗi ảnh {i}: {e}")
-        
-        print(f"✅ Hoàn thành! {len(data)} bản ghi")
+        data = [extract(ee.Image(images.get(i))) for i in range(size)]
         return pd.DataFrame(data)
-        
     except Exception as e:
-        print(f"❌ Lỗi: {e}")
+        print(f"NDVI error: {e}")
         return pd.DataFrame()
 
-# ==================== TVDI ====================
+# TVDI
 def get_tvdi_data(geometry, start_date, end_date, location_id):
-    """
-    Tính TVDI (Temperature Vegetation Dryness Index)
-    TVDI = (LST - LSTmin) / (LSTmax - LSTmin)
-    Trong đó LSTmax và LSTmin là hàm của NDVI
-    """
-    print(f"\n🔥 Đang tính TVDI (Temperature Vegetation Dryness Index)...")
-    
     try:
-        # Lấy MODIS LST và NDVI cùng thời điểm
-        # LST từ MOD11A2 (8-day composite)
         lst_collection = (
             ee.ImageCollection("MODIS/061/MOD11A2")
             .filterBounds(geometry)
@@ -363,33 +245,14 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
             .select(['LST_Day_1km'])
         )
         
-        # NDVI từ MOD13Q1 (16-day composite)
-        ndvi_collection = (
-            ee.ImageCollection("MODIS/061/MOD13Q1")
-            .filterBounds(geometry)
-            .filterDate(start_date, end_date)
-            .select(['NDVI'])
-        )
-        
         lst_size = lst_collection.size().getInfo()
-        print(f"   LST: {lst_size} ảnh, NDVI: {ndvi_collection.size().getInfo()} ảnh")
-        
         if lst_size == 0:
             return pd.DataFrame()
         
         def calculate_tvdi(lst_img):
             date = ee.Date(lst_img.get('system:time_start')).format('YYYY-MM-dd').getInfo()
-            
-            # Convert LST to Celsius (scale factor = 0.02, offset = -273.15)
             lst = lst_img.select('LST_Day_1km').multiply(0.02).subtract(273.15)
             
-            # Lấy NDVI gần nhất
-            ndvi_img = ndvi_collection.filterDate(
-                ee.Date(lst_img.get('system:time_start')).advance(-16, 'day'),
-                ee.Date(lst_img.get('system:time_start')).advance(16, 'day')
-            ).mean().select('NDVI').multiply(0.0001)
-            
-            # Tính LST stats
             lst_stats = lst.reduceRegion(
                 reducer=ee.Reducer.mean()
                     .combine(ee.Reducer.min(), '', True)
@@ -403,13 +266,9 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
             lst_min = lst_stats.get('LST_Day_1km_min')
             lst_max = lst_stats.get('LST_Day_1km_max')
             
-            # Tính TVDI đơn giản hóa
-            # TVDI = (LST - LSTmin) / (LSTmax - LSTmin)
             lst_range = ee.Number(lst_max).subtract(ee.Number(lst_min))
-            tvdi_val = ee.Number(lst_mean).subtract(ee.Number(lst_min)).divide(lst_range)
-            
-            # TVDI stats cho toàn vùng
             tvdi_img = lst.subtract(ee.Number(lst_min)).divide(lst_range)
+            
             tvdi_stats = tvdi_img.reduceRegion(
                 reducer=ee.Reducer.mean()
                     .combine(ee.Reducer.min(), '', True)
@@ -419,7 +278,6 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
                 maxPixels=1e13
             )
             
-            # Tính % diện tích khô hạn (TVDI > 0.6)
             drought_mask = tvdi_img.gt(0.6)
             drought_pct = drought_mask.reduceRegion(
                 reducer=ee.Reducer.mean(),
@@ -432,7 +290,6 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
             tvdi_min_val = tvdi_stats.get('LST_Day_1km_min')
             tvdi_max_val = tvdi_stats.get('LST_Day_1km_max')
             
-            # Phân loại hạn
             def classify_drought(tvdi):
                 if tvdi is None:
                     return 'unknown'
@@ -462,39 +319,22 @@ def get_tvdi_data(geometry, start_date, end_date, location_id):
             }
         
         lst_images = lst_collection.toList(lst_size)
-        data = []
-        
-        for i in range(lst_size):
-            try:
-                result = calculate_tvdi(ee.Image(lst_images.get(i)))
-                data.append(result)
-                if (i + 1) % 10 == 0:
-                    print(f"   ⏳ {i + 1}/{lst_size} ({((i+1)/lst_size*100):.1f}%)")
-            except Exception as e:
-                print(f"   ⚠️ Lỗi ảnh {i}: {e}")
-        
-        print(f"✅ Hoàn thành! {len(data)} bản ghi")
+        data = [calculate_tvdi(ee.Image(lst_images.get(i))) for i in range(lst_size)]
         return pd.DataFrame(data)
-        
     except Exception as e:
-        print(f"❌ Lỗi: {e}")
+        print(f"TVDI error: {e}")
         return pd.DataFrame()
 
-# ==================== DATABASE ====================
+# Save to database
 def save_to_database(df, table_name):
-    """Lưu DataFrame vào PostgreSQL"""
     if df.empty:
-        print(f"⚠️ Không có dữ liệu để lưu vào {table_name}")
-        return
-    
-    print(f"\n💾 Đang lưu {len(df)} bản ghi vào {table_name}...")
+        return 0
     
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cur = conn.cursor()
         
         saved = 0
-        errors = 0
         
         for _, row in df.iterrows():
             try:
@@ -558,78 +398,90 @@ def save_to_database(df, table_name):
                 
                 saved += 1
             except Exception as e:
-                errors += 1
-                if errors <= 3:
-                    print(f"   ⚠️ Lỗi: {e}")
+                print(f"Save error: {e}")
         
         conn.commit()
         cur.close()
         conn.close()
-        
-        print(f"✅ Đã lưu {saved}/{len(df)} bản ghi")
-        if errors > 0:
-            print(f"⚠️ Có {errors} lỗi")
-            
+        return saved
     except Exception as e:
-        print(f"❌ Lỗi kết nối database: {e}")
+        print(f"DB error: {e}")
+        return 0
 
-# ==================== MAIN ====================
-def main():
-    print("=" * 70)
-    print("     🌍 GOOGLE EARTH ENGINE - DATA EXTRACTION")
-    print("     Rainfall | Temperature | Soil Moisture | NDVI | TVDI")
-    print("=" * 70)
+# API Endpoints
+@app.route('/fetch-data', methods=['POST'])
+def fetch_data():
+    try:
+        data = request.json
+        province = data.get('province')
+        location_id = data.get('location_id')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        data_types = data.get('data_types', [])
+        
+        if not all([province, location_id, start_date, end_date]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        # Initialize GEE
+        if not initialize_gee():
+            return jsonify({'error': 'Failed to initialize Google Earth Engine'}), 500
+        
+        # Get geometry
+        geometry = get_region_geometry(province)
+        if geometry is None:
+            return jsonify({'error': f'Province not found: {province}'}), 404
+        
+        results = {}
+        
+        # Fetch data based on selected types
+        if 'rainfall' in data_types:
+            df = get_rainfall_data(geometry, start_date, end_date, location_id)
+            saved = save_to_database(df, 'rainfall_data')
+            results['rainfall'] = {'records': saved}
+        
+        if 'temperature' in data_types:
+            df = get_temperature_data(geometry, start_date, end_date, location_id)
+            saved = save_to_database(df, 'temperature_data')
+            results['temperature'] = {'records': saved}
+        
+        if 'soil_moisture' in data_types:
+            df = get_soil_moisture_data(geometry, start_date, end_date, location_id)
+            saved = save_to_database(df, 'soil_moisture_data')
+            results['soil_moisture'] = {'records': saved}
+        
+        if 'ndvi' in data_types:
+            df = get_ndvi_data(geometry, start_date, end_date, location_id)
+            saved = save_to_database(df, 'ndvi_data')
+            results['ndvi'] = {'records': saved}
+        
+        if 'tvdi' in data_types:
+            df = get_tvdi_data(geometry, start_date, end_date, location_id)
+            saved = save_to_database(df, 'tvdi_data')
+            results['tvdi'] = {'records': saved}
+        
+        return jsonify({
+            'success': True,
+            'province': province,
+            'location_id': location_id,
+            'period': f'{start_date} to {end_date}',
+            'results': results
+        })
     
-    if not initialize_gee():
-        return
-    
-    print(f"\n📍 Khu vực: {PROVINCE}")
-    print(f"📅 Thời gian: {START_DATE} → {END_DATE}")
-    
-    geometry = get_region_geometry(PROVINCE)
-    if geometry is None:
-        return
-    
-    # 1. Lượng mưa
-    print("\n" + "=" * 70)
-    rainfall_df = get_rainfall_data(geometry, START_DATE, END_DATE, LOCATION_ID)
-    if not rainfall_df.empty:
-        save_to_database(rainfall_df, 'rainfall_data')
-    
-    # 2. Nhiệt độ
-    print("\n" + "=" * 70)
-    temp_df = get_temperature_data(geometry, START_DATE, END_DATE, LOCATION_ID)
-    if not temp_df.empty:
-        save_to_database(temp_df, 'temperature_data')
-    
-    # 3. Độ ẩm đất
-    print("\n" + "=" * 70)
-    sm_df = get_soil_moisture_data(geometry, START_DATE, END_DATE, LOCATION_ID)
-    if not sm_df.empty:
-        save_to_database(sm_df, 'soil_moisture_data')
-    
-    # 4. NDVI
-    print("\n" + "=" * 70)
-    ndvi_df = get_ndvi_data(geometry, START_DATE, END_DATE, LOCATION_ID)
-    if not ndvi_df.empty:
-        save_to_database(ndvi_df, 'ndvi_data')
-    
-    # 5. TVDI
-    print("\n" + "=" * 70)
-    tvdi_df = get_tvdi_data(geometry, START_DATE, END_DATE, LOCATION_ID)
-    if not tvdi_df.empty:
-        save_to_database(tvdi_df, 'tvdi_data')
-    
-    # Tổng kết
-    print("\n" + "=" * 70)
-    print("                    ✅ HOÀN THÀNH!")
-    print("=" * 70)
-    print(f"  🌧️  Lượng mưa:    {len(rainfall_df)} bản ghi")
-    print(f"  🌡️  Nhiệt độ:     {len(temp_df)} bản ghi")
-    print(f"  💧 Độ ẩm đất:    {len(sm_df)} bản ghi")
-    print(f"  🌿 NDVI:         {len(ndvi_df)} bản ghi")
-    print(f"  🔥 TVDI:         {len(tvdi_df)} bản ghi")
-    print("=" * 70)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-if __name__ == "__main__":
-    main()
+@app.route('/status', methods=['GET'])
+def status():
+    return jsonify({
+        'status': 'online',
+        'gee_initialized': initialize_gee()
+    })
+
+if __name__ == '__main__':
+    print("=" * 70)
+    print("     🌍 Data Fetcher API Server")
+    print("=" * 70)
+    print("  Running on: http://localhost:3001")
+    print("  UI: Open data_fetcher.html in browser")
+    print("=" * 70)
+    app.run(host='0.0.0.0', port=3001, debug=True)

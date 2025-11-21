@@ -1,8 +1,7 @@
-
-
 // ============================================
 // routes/tvdi.routes.js
 // ============================================
+import express from "express";
 import TvdiModel from "../models/tvdi.model.js";
 
 const tvdiRouter = express.Router();
