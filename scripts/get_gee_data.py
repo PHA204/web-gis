@@ -9,9 +9,6 @@ import psycopg2
 from datetime import datetime, timedelta
 
 # ================== CẤU HÌNH ==================
-# Project ID từ Google Earth Engine
-PROJECT_ID = 'delta-surf-474905-q2'
-
 # Cấu hình database
 DB_CONFIG = {
     'dbname': 'web_gis',
@@ -25,22 +22,32 @@ DB_CONFIG = {
 PROVINCE = "Quang Tri"
 LOCATION_ID = 1
 START_DATE = "2020-01-01"
-END_DATE = "2020-12-31"  # Giảm xuống 1 năm để test trước
+END_DATE = "2020-12-31"
 
 # ===============================================
-
+ee.Authenticate()
 def initialize_gee():
     """Khởi tạo Google Earth Engine"""
     try:
-        ee.Initialize(project=PROJECT_ID)
-        print("✅ Đã kết nối Google Earth Engine thành công!")
-        return True
+        # Thử khởi tạo không cần project (cho tài khoản miễn phí)
+        try:
+            ee.Initialize()
+            print("✅ Đã kết nối Google Earth Engine thành công! (No project)")
+            return True
+        except:
+            # Nếu thất bại, thử với project
+            ee.Initialize(project='where-earthengine')
+            print("✅ Đã kết nối Google Earth Engine thành công! (With project)")
+            return True
+            
     except Exception as e:
         print(f"❌ Lỗi khi khởi tạo GEE: {e}")
         print("\n🔧 Hướng dẫn khắc phục:")
         print("1. Chạy lệnh: earthengine authenticate")
         print("2. Đăng nhập và cấp quyền")
-        print("3. Chạy lại script này")
+        print("3. Nếu có nhiều project, set default:")
+        print("   earthengine set_project YOUR_PROJECT_ID")
+        print("4. Chạy lại script này")
         return False
 
 def get_region_geometry(province_name):
@@ -196,13 +203,17 @@ def save_to_database(df, table_name):
         cur = conn.cursor()
         
         saved_count = 0
+        error_count = 0
+        
         for _, row in df.iterrows():
             try:
                 if table_name == 'rainfall_data':
                     cur.execute("""
                         INSERT INTO rainfall_data (location_id, date, rainfall_mm, source)
                         VALUES (%s, %s, %s, %s)
-                        ON CONFLICT DO NOTHING
+                        ON CONFLICT (location_id, date) DO UPDATE 
+                        SET rainfall_mm = EXCLUDED.rainfall_mm,
+                            source = EXCLUDED.source
                     """, (row['location_id'], row['date'], row['rainfall_mm'], row['source']))
                 
                 elif table_name == 'temperature_data':
@@ -210,25 +221,35 @@ def save_to_database(df, table_name):
                         INSERT INTO temperature_data 
                         (location_id, date, temp_min, temp_max, temp_mean, source)
                         VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT DO NOTHING
+                        ON CONFLICT (location_id, date) DO UPDATE 
+                        SET temp_min = EXCLUDED.temp_min,
+                            temp_max = EXCLUDED.temp_max,
+                            temp_mean = EXCLUDED.temp_mean,
+                            source = EXCLUDED.source
                     """, (row['location_id'], row['date'], row['temp_min'], 
                           row['temp_max'], row['temp_mean'], row['source']))
                 
                 saved_count += 1
+                
             except Exception as e:
-                print(f"   ⚠️  Lỗi khi lưu dòng: {e}")
+                error_count += 1
+                if error_count <= 5:
+                    print(f"   ⚠️  Lỗi khi lưu dòng: {e}")
         
         conn.commit()
         cur.close()
         conn.close()
+        
         print(f"✅ Đã lưu thành công {saved_count}/{len(df)} bản ghi")
+        if error_count > 0:
+            print(f"⚠️  Có {error_count} lỗi khi lưu")
         
     except Exception as e:
         print(f"❌ Lỗi kết nối database: {e}")
         print("\n🔧 Kiểm tra:")
         print("1. PostgreSQL đã chạy chưa?")
         print("2. Database 'web_gis' đã tạo chưa?")
-        print("3. Thông tin kết nối trong DB_CONFIG có đúng không?")
+        print("3. Đã tạo UNIQUE constraints chưa? (chạy add_constraints.py)")
 
 def main():
     """Hàm chính"""
@@ -241,7 +262,7 @@ def main():
         return
     
     # Lấy geometry
-    print(f"\n📍 Khu vực: {PROVINCE}")
+    print(f"\n🗺️  Khu vực: {PROVINCE}")
     geometry = get_region_geometry(PROVINCE)
     
     if geometry is None:
