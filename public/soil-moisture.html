@@ -21,13 +21,33 @@
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         .nav-container {
-            max-width: 1600px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 0 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    #userInfo {
+        margin-left: auto;
+    }
+
+    #userInfo button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.1);
+        color: #fff;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-size: 0.9em;
+    }
+
+    #userInfo button:hover {
+        background: rgba(255,107,107,0.3);
+        transform: translateY(-2px);
+    }
         .logo {
             font-size: 1.5em;
             font-weight: bold;
@@ -222,6 +242,23 @@
         .level-moist { background: #91cf60; }
         .level-wet { background: #1a9850; }
 
+        #smDesc {
+            margin-top: 15px;
+            color: rgba(255,255,255,0.95);
+            text-align: left;
+            line-height: 1.8;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
+
+        #smDesc strong {
+            color: #4fc3f7;
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -284,15 +321,16 @@
 <body>
     <nav>
         <div class="nav-container">
-            <div class="logo">🌍 Web GIS</div>
+            <div class="logo" style="margin-right: 30px;">🌍 Trang chủ </div>
             <ul class="nav-links">
-                <li><a href="index.html">Dashboard</a></li>
+                <li><a href="index.html" >Trang chủ</a></li>
                 <li><a href="rainfall.html">Lượng mưa</a></li>
                 <li><a href="temperature.html">Nhiệt độ</a></li>
                 <li><a href="soil-moisture.html" class="active">Độ ẩm đất</a></li>
                 <li><a href="ndvi.html">NDVI</a></li>
                 <li><a href="tvdi.html">TVDI</a></li>
             </ul>
+            <div id="userInfo"></div>
         </div>
     </nav>
 
@@ -580,24 +618,107 @@
             return { level: 'wet', label: 'Rất ẩm', color: '#1a9850', css: 'level-wet' };
         }
 
-        function updateAlert(stats) {
-            const sm = parseFloat(stats.average_surface);
-            const cls = classifySoilMoisture(sm);
+       function updateAlert(stats) {
+    const sm = parseFloat(stats.average_surface);
+    const cls = classifySoilMoisture(sm);
 
-            document.getElementById('alertBanner').style.display = 'block';
-            const levelEl = document.getElementById('smLevel');
-            levelEl.textContent = cls.label.toUpperCase();
-            levelEl.className = 'sm-level ' + cls.css;
+    document.getElementById('alertBanner').style.display = 'block';
+    const levelEl = document.getElementById('smLevel');
+    levelEl.textContent = cls.label.toUpperCase();
+    levelEl.className = 'sm-level ' + cls.css;
 
-            let desc = '';
-            if (cls.level === 'very_dry') desc = 'Đất rất khô, nguy cơ hạn hán và cháy rừng cao.';
-            else if (cls.level === 'dry') desc = 'Đất khô, cây trồng có thể bị stress nước, cần tưới bổ sung.';
-            else if (cls.level === 'normal') desc = 'Độ ẩm đất ở mức bình thường, điều kiện tương đối ổn định.';
-            else if (cls.level === 'moist') desc = 'Đất ẩm tốt, thuận lợi cho sinh trưởng cây trồng.';
-            else if (cls.level === 'wet') desc = 'Đất rất ẩm, có thể xảy ra úng, cần theo dõi thoát nước.';
+    let desc = '';
+    if (cls.level === 'very_dry') {
+        desc = `
+            <strong>📌 Thực tế:</strong><br>
+            • Đất khô nứt, màu nhạt, kết cấu tơi và rời<br>
+            • Cây trồng khó hút nước, nhất là vùng đất cát và đất đỏ<br>
+            • Bề mặt đất cứng, khô ráo hoàn toàn<br><br>
+            
+            <strong>🌱 Tác động nghiêm trọng:</strong><br>
+            • Cây dễ chết, giảm năng suất mạnh (>40%)<br>
+            • Cháy rừng xảy ra cực nhanh, nguy hiểm cao<br>
+            • Gió mạnh dễ gây bụi và xói mòn đất<br>
+            • Đất mất cấu trúc, thoái hóa nhanh<br><br>
+            
+            <strong>🆘 CẢNH BÁO KHẨN CẤP:</strong> Đất cực kỳ khô hạn! 
+            Cây trồng mất nước nghiêm trọng, nguy cơ cháy rừng ở mức rất cao. 
+            Cần tưới khẩn cấp hoặc tạm dừng canh tác.
+        `;
+    } else if (cls.level === 'dry') {
+        desc = `
+            <strong>📌 Thực tế:</strong><br>
+            • Đất thiếu ẩm, bề mặt bắt đầu cứng lại<br>
+            • Vùng đồi dốc dễ xảy ra rửa trôi và thoái hóa đất<br>
+            • Lớp đất mặt bị khô, cây khó hút nước<br><br>
+            
+            <strong>🌱 Tác động:</strong><br>
+            • Cây bắt đầu cuốn lá, giảm quang hợp<br>
+            • Rau màu và hồ tiêu dễ bị chết nếu kéo dài<br>
+            • Nguy cơ giảm năng suất 15-30%<br>
+            • Cháy rừng có thể xảy ra nếu có nguồn lửa<br><br>
+            
+            <strong>🟧 Cảnh báo:</strong> Độ ẩm thấp! Đất và cây trồng đang thiếu nước nghiêm trọng. 
+            Cần bổ sung tưới tiêu ngay lập tức để tránh thiệt hại.
+        `;
+    } else if (cls.level === 'normal') {
+        desc = `
+            <strong>📌 Thực tế:</strong><br>
+            • Đất đủ ẩm cho giai đoạn sinh trưởng<br>
+            • Tốt cho lúa, ngô, sắn, cây công nghiệp thời điểm đầu vụ<br>
+            • Độ ẩm cân bằng, không quá khô hay quá ướt<br><br>
+            
+            <strong>🌱 Tác động:</strong><br>
+            • Cây phát triển ổn định, sinh trưởng bình thường<br>
+            • Ít nguy cơ hạn ngắn hạn<br>
+            • Điều kiện thuận lợi cho hầu hết cây trồng<br>
+            • Nguy cơ cháy rừng thấp<br><br>
+            
+            <strong>🟩 Đánh giá:</strong> Độ ẩm đất đạt mức trung bình, điều kiện bình thường. 
+            Cây trồng phát triển ổn định, duy trì theo dõi thường xuyên.
+        `;
+    } else if (cls.level === 'moist') {
+        desc = `
+            <strong>📌 Thực tế:</strong><br>
+            • Đất giữ nước tốt, phù hợp cho rừng và cây lâu năm<br>
+            • Giảm nhiệt độ đất → hệ sinh thái cân bằng<br>
+            • Độ ẩm đủ cho cả tầng rễ sâu và nông<br><br>
+            
+            <strong>🌱 Lợi ích:</strong><br>
+            • Cây quang hợp mạnh, phát triển tốt<br>
+            • Ít nguy cơ cháy rừng<br>
+            • Độ ẩm ổn định cho cả tầng rễ sâu<br>
+            • Điều kiện lý tưởng cho sinh trưởng<br><br>
+            
+            <strong>✅ Đánh giá:</strong> Độ ẩm đất tốt! Điều kiện thuận lợi cho cây trồng, rừng và hệ sinh thái. 
+            Duy trì chế độ quản lý hiện tại.
+        `;
+    } else if (cls.level === 'wet') {
+        desc = `
+            <strong>📌 Thực tế:</strong><br>
+            • Đất rất ẩm, gần bão hòa nước<br>
+            • Giảm nhiệt độ đất mạnh → hệ sinh thái cân bằng tốt<br>
+            • Bề mặt đất ướt, có thể xuất hiện nước đọng cục bộ<br><br>
+            
+            <strong>🌱 Lợi ích:</strong><br>
+            • Cây quang hợp rất mạnh, sinh trưởng tối ưu<br>
+            • Nguy cơ cháy rừng rất thấp<br>
+            • Hệ sinh thái ổn định, đa dạng sinh học cao<br>
+            • Nguồn nước ngầm được bổ sung tốt<br><br>
+            
+            <strong>⚠️ Lưu ý:</strong> Độ ẩm rất cao! Điều kiện rất tốt cho cây trồng. 
+            Tuy nhiên, cần theo dõi hệ thống thoát nước để tránh úng cục bộ nếu mưa kéo dài. 
+            Một số cây trồng nhạy cảm với úng cần được chú ý.
+        `;
+    } else {
+        desc = `
+            <strong>📌 Trạng thái:</strong> Không có đủ dữ liệu để đánh giá.<br><br>
+            <strong>💡 Khuyến nghị:</strong> Vui lòng tải dữ liệu từ GEE hoặc kiểm tra lại khoảng thời gian.
+        `;
+    }
 
-            document.getElementById('smDesc').textContent = desc;
-        }
+    document.getElementById('smDesc').innerHTML = desc;
+}
 
         function drawSmChart(data) {
             const ctx = document.getElementById('smChart');
@@ -736,11 +857,20 @@
             }
         }
 
-        window.onload = () => {
+        window.onload = async () => {
+            const isValid = await AuthHelper.verifyToken();
+            if (!isValid) {
+                window.location.href = 'login.html';
+                return;
+            }
             loadLocations();
             checkGEEStatus();
             setInterval(checkGEEStatus, 30000);
+            
+            // Log activity
+            await AuthHelper.logActivity('page_view', 'soil-moisture');
         };
     </script>
+    <script src="js/auth.js"></script>
 </body>
 </html>

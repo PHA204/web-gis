@@ -28,6 +28,26 @@
             justify-content: space-between;
             align-items: center;
         }
+
+        #userInfo {
+            margin-left: auto;
+        }
+
+        #userInfo button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        #userInfo button:hover {
+            background: rgba(255,107,107,0.3);
+            transform: translateY(-2px);
+        }
         .logo {
             font-size: 1.5em;
             font-weight: bold;
@@ -274,7 +294,23 @@
             height: 20px;
             border-radius: 4px;
         }
+        #vegDesc {
+            margin-top: 15px;
+            color: rgba(255,255,255,0.95);
+            text-align: left;
+            line-height: 1.8;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
 
+        #vegDesc strong {
+            color: #00ff88;
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
         @media (max-width: 768px) {
             .dashboard { grid-template-columns: 1fr; }
             .control-row { flex-direction: column; }
@@ -285,15 +321,16 @@
 <body>
     <nav>
         <div class="nav-container">
-            <div class="logo">🌍 Web GIS</div>
+            <div class="logo" style="margin-right: 30px;">🌍 Trang chủ </div>
             <ul class="nav-links">
-                <li><a href="index.html">Dashboard</a></li>
+                <li><a href="index.html" >Trang chủ</a></li>
                 <li><a href="rainfall.html">Lượng mưa</a></li>
                 <li><a href="temperature.html">Nhiệt độ</a></li>
                 <li><a href="soil-moisture.html">Độ ẩm đất</a></li>
                 <li><a href="ndvi.html" class="active">NDVI</a></li>
                 <li><a href="tvdi.html">TVDI</a></li>
             </ul>
+            <div id="userInfo"></div>
         </div>
     </nav>
 
@@ -587,7 +624,7 @@
 
         function classifyNdvi(value) {
             const v = parseFloat(value);
-            if (isNaN(v)) return { level: 'unknown', label: 'Không có dữ liệu', color: '#999', css: '' };
+            if (isNaN(v)) return { level: 'unknown', label: 'Không có dữ liệu - nhấn tải từ GEE ', color: '#999', css: '' };
             if (v < 0) return { level: 'water', label: 'Nước / Không thực vật', color: '#0571b0', css: 'level-water' };
             if (v < 0.1) return { level: 'bare', label: 'Đất trống', color: '#ca0020', css: 'level-bare' };
             if (v < 0.2) return { level: 'sparse', label: 'Thực vật thưa', color: '#f4a582', css: 'level-sparse' };
@@ -596,25 +633,66 @@
             return { level: 'very_dense', label: 'Thực vật rất dày', color: '#1b7837', css: 'level-very-dense' };
         }
 
-        function updateAlert(stats) {
-            const ndvi = parseFloat(stats.average);
-            const cls = classifyNdvi(ndvi);
+       function updateAlert(stats) {
+    const ndvi = parseFloat(stats.average);
+    const cls = classifyNdvi(ndvi);
 
-            document.getElementById('alertBanner').style.display = 'block';
-            const levelEl = document.getElementById('vegLevel');
-            levelEl.textContent = cls.label.toUpperCase();
-            levelEl.className = 'veg-level ' + cls.css;
+    document.getElementById('alertBanner').style.display = 'block';
+    const levelEl = document.getElementById('vegLevel');
+    levelEl.textContent = cls.label.toUpperCase();
+    levelEl.className = 'veg-level ' + cls.css;
 
-            let desc = '';
-            if (cls.level === 'water') desc = 'Khu vực chủ yếu là mặt nước hoặc không có thảm thực vật.';
-            else if (cls.level === 'bare') desc = 'Thảm thực vật rất ít, khu vực có nguy cơ xói mòn, suy thoái đất.';
-            else if (cls.level === 'sparse') desc = 'Thảm thực vật thưa, cần theo dõi sự thay đổi theo thời gian.';
-            else if (cls.level === 'moderate') desc = 'Thảm thực vật ở mức trung bình, phù hợp cho canh tác nhưng vẫn cần quản lý tốt.';
-            else if (cls.level === 'dense') desc = 'Thảm thực vật dày, hệ sinh thái khỏe mạnh.';
-            else if (cls.level === 'very_dense') desc = 'Thảm thực vật rất dày, khu vực rừng tốt hoặc sinh khối cao.';
+    let desc = '';
+    if (cls.level === 'water') {
+        desc = `
+            <strong>📌 Mô tả:</strong> NDVI âm nghĩa là không có thực vật, phản xạ đặc trưng của nước, ao hồ, sông suối, đầm phá.<br><br>
+            <strong>🌿 Tình trạng:</strong> Không có thảm thực vật. Khu vực giữ ẩm tốt, hạ nhiệt độ khu vực xung quanh.<br><br>
+            <strong>💡 Ứng dụng:</strong> Phân định mặt nước, theo dõi biến động mực nước mùa mưa-mùa khô.
+        `;
+    } else if (cls.level === 'bare') {
+        desc = `
+            <strong>📌 Mô tả:</strong> NDVI rất thấp → bề mặt ít hoặc không có cây xanh. Khu dân cư, công trình, đất cát trống.<br><br>
+            <strong>🔥 Cảnh báo:</strong><br>
+            • Hiệu ứng đảo nhiệt đô thị cao<br>
+            • Bốc hơi thấp → đất dễ nóng lên<br>
+            • Nguy cơ thoái hóa đất nếu là vùng nông nghiệp bỏ hoang<br><br>
+            <strong>💡 Khuyến nghị:</strong> Cần theo dõi, nguy cơ xói mòn và suy thoái đất cao.
+        `;
+    } else if (cls.level === 'sparse') {
+        desc = `
+            <strong>📌 Mô tả:</strong> NDVI trung bình → có cây xanh nhưng không dày đặc. Đồng cỏ, cây bụi, vùng trồng trọt thưa.<br><br>
+            <strong>🌿 Tình trạng:</strong> Có lớp phủ thực vật nhưng khả năng điều tiết nhiệt chỉ ở mức vừa. Độ ẩm đất phụ thuộc lớn vào lượng mưa.<br><br>
+            <strong>💡 Tác động:</strong> Vùng nông nghiệp có thể đang bước sang giai đoạn khô hạn nhẹ. Vùng đất dốc dễ xảy ra xói mòn.
+        `;
+    } else if (cls.level === 'moderate') {
+        desc = `
+            <strong>📌 Mô tả:</strong> Thảm thực vật ở mức trung bình, phù hợp cho canh tác.<br><br>
+            <strong>🌿 Tình trạng:</strong> Cân bằng sinh thái tương đối tốt, cây trồng phát triển ổn định.<br><br>
+            <strong>💡 Khuyến nghị:</strong> Cần quản lý tốt nguồn nước và đất để duy trì năng suất.
+        `;
+    } else if (cls.level === 'dense') {
+        desc = `
+            <strong>📌 Mô tả:</strong> NDVI cao → sinh khối tốt, cây xanh dày đặc, rừng khỏe mạnh.<br><br>
+            <strong>🌱 Tình trạng:</strong><br>
+            • Điều kiện sinh thái tốt → khả năng giữ nước, giảm nhiệt độ khu vực<br>
+            • Chỉ số NDVI cao cho thấy hệ sinh thái ổn định<br>
+            • Tỷ lệ quang hợp cao<br><br>
+            <strong>💡 Tác động:</strong> Giúp giảm hiệu ứng đảo nhiệt, tạo vùng đệm sinh thái, bảo vệ đất.
+        `;
+    } else if (cls.level === 'very_dense') {
+        desc = `
+            <strong>📌 Mô tả:</strong> Thảm thực vật rất dày, khu vực rừng tốt hoặc sinh khối cao.<br><br>
+            <strong>🌱 Lợi ích:</strong><br>
+            • Giảm hiệu ứng đảo nhiệt mạnh<br>
+            • Tạo vùng đệm sinh thái quan trọng<br>
+            • Bảo vệ đất và hạn chế xói mòn hiệu quả<br>
+            • Duy trì nguồn nước ngầm tốt<br><br>
+            <strong>✅ Kết luận:</strong> Hệ sinh thái rất khỏe mạnh, cần được bảo tồn.
+        `;
+    }
 
-            document.getElementById('vegDesc').textContent = desc;
-        }
+    document.getElementById('vegDesc').innerHTML = desc;
+}
 
         function drawNdviChart(data) {
             const ctx = document.getElementById('ndviChart');
@@ -767,11 +845,20 @@
             }
         }
 
-        window.onload = () => {
+      window.onload = async () => {
+            const isValid = await AuthHelper.verifyToken();
+            if (!isValid) {
+                window.location.href = 'login.html';
+                return;
+            }
             loadLocations();
             checkGEEStatus();
             setInterval(checkGEEStatus, 30000);
+            
+            // Log activity
+            await AuthHelper.logActivity('page_view', 'ndvi');
         };
     </script>
+     <script src="js/auth.js"></script>
 </body>
 </html>

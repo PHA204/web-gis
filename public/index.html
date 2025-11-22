@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Web GIS</title>
+    <title>Trang chủ - Phương</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -27,6 +27,26 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+        }
+
+        #userInfo {
+            margin-left: auto;
+        }
+
+        #userInfo button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        #userInfo button:hover {
+            background: rgba(255,107,107,0.3);
+            transform: translateY(-2px);
         }
         .logo {
             font-size: 1.5em;
@@ -133,78 +153,42 @@
             h1 { font-size: 2em; }
             .cards-grid { grid-template-columns: 1fr; }
         }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%),
+            url('https://img.freepik.com/free-photo/anime-moon-landscape_23-2151645871.jpg?semt=ais_hybrid&w=740&q=80');
+            background-size: cover;
+            background-position: center;
+            background-blend-mode: overlay;
+            min-height: 100vh;
+            color: #fff;
+            }
     </style>
 </head>
 <body>
     <nav>
         <div class="nav-container">
-            <div class="logo">🌍 Web GIS</div>
+            <div class="logo" style="margin-right: 30px;">Trang chủ </div>
             <ul class="nav-links">
-                <li><a href="index.html" class="active">Dashboard</a></li>
+                <li><a href="index.html" class="active">Trang chủ</a></li>
                 <li><a href="rainfall.html">Lượng mưa</a></li>
                 <li><a href="temperature.html">Nhiệt độ</a></li>
                 <li><a href="soil-moisture.html">Độ ẩm đất</a></li>
                 <li><a href="ndvi.html">NDVI</a></li>
                 <li><a href="tvdi.html">TVDI</a></li>
             </ul>
+            <div id="userInfo"></div>
         </div>
     </nav>
 
     <div class="container">
         <header>
-            <h1>🌍 Hệ thống Giám sát Khí hậu & Hạn hán</h1>
-            <p class="subtitle">Chọn chỉ số để xem phân tích chi tiết</p>
+            <h1 style="font-size: 130px; color: rgb(19, 19, 19);">Hệ thống Phân tích và đánh giá Sự Thay Đổi Thời Tiết</h1>
+           
         </header>
-
-        <div class="cards-grid">
-            <a href="overview.html" class="feature-card overview-card">
-                <div class="card-icon">📊</div>
-                <div class="card-title">Tổng quan</div>
-                <div class="card-description">
-                    Xem tổng hợp tất cả các chỉ số khí hậu và hạn hán trong một màn hình
-                </div>
-            </a>
-
-            <a href="rainfall.html" class="feature-card rainfall-card">
-                <div class="card-icon">🌧️</div>
-                <div class="card-title">Lượng mưa</div>
-                <div class="card-description">
-                    Phân tích lượng mưa theo ngày, tháng, năm. Dữ liệu từ CHIRPS
-                </div>
-            </a>
-
-            <a href="temperature.html" class="feature-card temperature-card">
-                <div class="card-icon">🌡️</div>
-                <div class="card-title">Nhiệt độ</div>
-                <div class="card-description">
-                    Theo dõi nhiệt độ min, max, trung bình. Dữ liệu từ ERA5
-                </div>
-            </a>
-
-            <a href="soil-moisture.html" class="feature-card soil-card">
-                <div class="card-icon">💧</div>
-                <div class="card-title">Độ ẩm đất</div>
-                <div class="card-description">
-                    Giám sát độ ẩm ở các tầng đất khác nhau. Dữ liệu từ ERA5-Land
-                </div>
-            </a>
-
-            <a href="ndvi.html" class="feature-card ndvi-card">
-                <div class="card-icon">🌿</div>
-                <div class="card-title">NDVI</div>
-                <div class="card-description">
-                    Đánh giá tình trạng thực vật và diện tích phủ xanh. Dữ liệu MODIS
-                </div>
-            </a>
-
-            <a href="tvdi.html" class="feature-card tvdi-card">
-                <div class="card-icon">🔥</div>
-                <div class="card-title">TVDI - Hạn hán</div>
-                <div class="card-description">
-                    Chỉ số hạn hán, phân loại mức độ từ ẩm ướt đến cực đoan
-                </div>
-            </a>
-        </div>
+        
+        
     </div>
+     <script src="js/auth.js"></script>
 </body>
 </html>

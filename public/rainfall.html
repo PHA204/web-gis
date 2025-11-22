@@ -28,6 +28,26 @@
             justify-content: space-between;
             align-items: center;
         }
+
+        #userInfo {
+            margin-left: auto;
+        }
+
+        #userInfo button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        #userInfo button:hover {
+            background: rgba(255,107,107,0.3);
+            transform: translateY(-2px);
+        }
         .logo {
             font-size: 1.5em;
             font-weight: bold;
@@ -238,20 +258,66 @@
             .control-row { flex-direction: column; }
             .nav-links { display: none; }
         }
+        .alert-banner {
+        background: linear-gradient(135deg, rgba(0,217,255,0.2), rgba(0,255,136,0.2));
+        border: 2px solid #00d9ff;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        text-align: center;
+        }
+        .alert-title { 
+            font-size: 1.3em; 
+            font-weight: bold; 
+            margin-bottom: 10px; 
+            color: #00d9ff; 
+        }
+        .rain-level {
+            display: inline-block;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+        .level-no-rain { background: #d73027; }
+        .level-light { background: #fc8d59; }
+        .level-moderate { background: #fee08b; color:#333; }
+        .level-heavy { background: #91cf60; }
+        .level-very-heavy { background: #1a9850; }
+
+        #rainDesc {
+            margin-top: 15px;
+            color: rgba(255,255,255,0.95);
+            text-align: left;
+            line-height: 1.8;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
+
+        #rainDesc strong {
+            color: #00d9ff;
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
     <nav>
         <div class="nav-container">
-            <div class="logo">🌍 Web GIS</div>
+            <div class="logo" style="margin-right: 30px;">🌍 Trang chủ </div>
             <ul class="nav-links">
-                <li><a href="index.html">Dashboard</a></li>
+                <li><a href="index.html" >Trang chủ</a></li>
                 <li><a href="rainfall.html" class="active">Lượng mưa</a></li>
                 <li><a href="temperature.html">Nhiệt độ</a></li>
                 <li><a href="soil-moisture.html">Độ ẩm đất</a></li>
                 <li><a href="ndvi.html">NDVI</a></li>
                 <li><a href="tvdi.html">TVDI</a></li>
             </ul>
+            <div id="userInfo"></div>
         </div>
     </nav>
 
@@ -288,7 +354,12 @@
                 </button>
             </div>
         </div>
-
+        <!-- Thêm Alert Banner -->
+        <div id="alertBanner" class="alert-banner" style="display:none;">
+            <div class="alert-title">🌧️ ĐÁNH GIÁ LƯỢNG MƯA</div>
+            <div class="rain-level" id="rainLevel">--</div>
+            <p id="rainDesc" style="margin-top:10px; color:rgba(255,255,255,0.9);">--</p>
+        </div>
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon">💧</div>
@@ -368,6 +439,7 @@
 
     <script>
         const API = 'http://localhost:3000/api';
+        const PYTHON_API = 'http://localhost:3001'; // cho các file cần GEE
         let charts = {};
         let geeOnline = false;
 
@@ -511,6 +583,7 @@
                 ]);
 
                 updateStats(daily.statistics);
+                updateAlert(daily.statistics);
                 drawDailyChart(daily.data);
                 drawMonthlyChart(monthly.monthly_data);
                 drawDistributionChart(daily.data);
@@ -527,6 +600,91 @@
             document.getElementById('maxRain').textContent = stats.max;
             document.getElementById('rainyDays').textContent = stats.days || 0;
         }
+
+        function classifyRainfall(value) {
+    const v = parseFloat(value);
+    if (isNaN(v)) return { level: 'unknown', label: 'Không có dữ liệu', color: '#999', css: '' };
+    if (v < 2) return { level: 'no_rain', label: 'Không mưa / Khô hạn', color: '#d73027', css: 'level-no-rain' };
+    if (v < 10) return { level: 'light', label: 'Mưa nhẹ', color: '#fc8d59', css: 'level-light' };
+    if (v < 30) return { level: 'moderate', label: 'Mưa vừa', color: '#fee08b', css: 'level-moderate' };
+    if (v < 50) return { level: 'heavy', label: 'Mưa lớn', color: '#91cf60', css: 'level-heavy' };
+    return { level: 'very_heavy', label: 'Mưa rất lớn', color: '#1a9850', css: 'level-very-heavy' };
+}
+
+function updateAlert(stats) {
+    const avgRain = parseFloat(stats.average);
+    const cls = classifyRainfall(avgRain);
+
+    document.getElementById('alertBanner').style.display = 'block';
+    const levelEl = document.getElementById('rainLevel');
+    levelEl.textContent = cls.label.toUpperCase();
+    levelEl.className = 'rain-level ' + cls.css;
+
+    let desc = '';
+    if (cls.level === 'no_rain') {
+        desc = `
+            <strong>📌 Mô tả thực tế:</strong><br>
+            • Bề mặt đất hoàn toàn không được bổ sung nước<br>
+            • Nhiệt độ đất tăng nhanh do bốc hơi mạnh<br>
+            • Bụi mịn tăng cao ở khu vực đô thị và đường đất<br>
+            • Đất nông nghiệp khô, cây bắt đầu cuốn lá hoặc héo vào buổi trưa<br><br>
+            
+            <strong>🌱 Ảnh hưởng:</strong><br>
+            • Nguy cơ hạn hán nếu kéo dài 3-5 ngày liên tục<br>
+            • Hồ nhỏ và mương nội đồng bắt đầu cạn<br>
+            • Rừng khộp, rừng keo, bạch đàn dễ bén lửa<br><br>
+            
+            <strong>⚠️ Cảnh báo:</strong> Không có mưa. Đất và cây trồng không được cung cấp nước. 
+            Độ ẩm đất giảm nhanh, nguy cơ hạn hán và cháy rừng tăng mạnh nếu tình trạng kéo dài.
+        `;
+    } else if (cls.level === 'light') {
+        desc = `
+            <strong>📌 Mô tả thực tế:</strong><br>
+            • Mưa chỉ đủ làm mát bề mặt, không thấm sâu vào tầng đất<br>
+            • Đường xá khô lại sau 1-2 giờ sau mưa<br>
+            • Không cải thiện đáng kể nguồn nước tưới<br><br>
+            
+            <strong>🌱 Ảnh hưởng:</strong><br>
+            • Cây trồng tạm thời giảm stress nhiệt<br>
+            • Nhiệt độ đất giảm nhưng sau đó tăng lại nhanh<br><br>
+            
+            <strong>⚠️ Cảnh báo:</strong> Mưa nhẹ giúp giảm nhiệt nhưng không đủ để cải thiện độ ẩm đất. 
+            Các khu vực sản xuất vẫn cần duy trì tưới tiêu.
+        `;
+    } else if (cls.level === 'moderate') {
+        desc = `
+            <strong>📌 Mô tả thực tế:</strong><br>
+            • Lượng mưa đủ thấm xuống tầng đất 10-20 cm<br>
+            • Giúp phục hồi độ ẩm đất sau thời gian khô hạn ngắn<br>
+            • Nước chảy tràn ít, thấm tốt vào ruộng và rừng<br><br>
+            
+            <strong>🌱 Ảnh hưởng:</strong><br>
+            • Cây lúa, ngô, sắn, hồ tiêu phục hồi sinh trưởng<br>
+            • Giảm khả năng cháy rừng<br>
+            • Bổ sung nước cho sông suối nhỏ<br><br>
+            
+            <strong>✅ Đánh giá:</strong> Mưa vừa giúp bổ sung nước đáng kể cho đất và cây trồng. 
+            Độ ẩm được cải thiện rõ rệt, điều kiện thuận lợi cho sản xuất nông nghiệp.
+        `;
+    } else if (cls.level === 'heavy' || cls.level === 'very_heavy') {
+        desc = `
+            <strong>📌 Mô tả thực tế:</strong><br>
+            • Nước chảy mạnh, đất không kịp thấm → dễ gây xói mòn<br>
+            • Đồi dốc có nguy cơ trượt đất, lũ quét<br>
+            • Đô thị dễ ngập cục bộ nếu hệ thống thoát nước kém<br>
+            • Rễ cây bị ngập úng nếu mưa kéo dài<br><br>
+            
+            <strong>🌱 Ảnh hưởng:</strong><br>
+            • Khu vực nông nghiệp có thể bị hỏng rễ, thối gốc<br>
+            • Sạt lở đất ở vùng đồi núi Quảng Trị, Quảng Nam, Tây Nguyên<br><br>
+            
+            <strong>🆘 Cảnh báo:</strong> Mưa lớn. Nguy cơ xói mòn, ngập úng cục bộ, lũ quét tại khu vực đồi núi. 
+            Cần theo dõi chặt chẽ hệ thống thoát nước và bảo vệ cây trồng.
+        `;
+    }
+
+    document.getElementById('rainDesc').innerHTML = desc;
+}
 
         function drawDailyChart(data) {
             const ctx = document.getElementById('dailyChart');
@@ -660,11 +818,20 @@
         }
 
         // Init
-        window.onload = () => {
+        window.onload = async () => {
+            const isValid = await AuthHelper.verifyToken();
+            if (!isValid) {
+                window.location.href = 'login.html';
+                return;
+            }
             loadLocations();
             checkGEEStatus();
-            setInterval(checkGEEStatus, 30000); // Check every 30s
+            setInterval(checkGEEStatus, 30000);
+            
+            // Log activity
+            await AuthHelper.logActivity('page_view', 'rainfall');
         };
     </script>
+     <script src="js/auth.js"></script>
 </body>
 </html>

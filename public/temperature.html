@@ -28,6 +28,26 @@
             justify-content: space-between;
             align-items: center;
         }
+
+        #userInfo {
+            margin-left: auto;
+        }
+
+        #userInfo button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        #userInfo button:hover {
+            background: rgba(255,107,107,0.3);
+            transform: translateY(-2px);
+        }
         .logo {
             font-size: 1.5em;
             font-weight: bold;
@@ -237,20 +257,66 @@
             .control-row { flex-direction: column; }
             .nav-links { display: none; }
         }
+        .alert-banner {
+            background: linear-gradient(135deg, rgba(255,107,107,0.2), rgba(238,90,111,0.2));
+            border: 2px solid #ff6b6b;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .alert-title { 
+            font-size: 1.3em; 
+            font-weight: bold; 
+            margin-bottom: 10px; 
+            color: #ff6b6b; 
+        }
+        .temp-level {
+            display: inline-block;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+        .level-cool { background: #4ecdc4; }
+        .level-normal { background: #95e1d3; color:#333; }
+        .level-warm { background: #feca57; color:#333; }
+        .level-hot { background: #ff6b6b; }
+        .level-extreme { background: #d73027; }
+
+        #tempDesc {
+            margin-top: 15px;
+            color: rgba(255,255,255,0.95);
+            text-align: left;
+            line-height: 1.8;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
+
+        #tempDesc strong {
+            color: #ff6b6b;
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
     <nav>
         <div class="nav-container">
-            <div class="logo">🌍 Web GIS</div>
+            <div class="logo" style="margin-right: 30px;">🌍 Trang chủ </div>
             <ul class="nav-links">
-                <li><a href="index.html">Dashboard</a></li>
+                <li><a href="index.html"  >Trang chủ</a></li>
                 <li><a href="rainfall.html">Lượng mưa</a></li>
                 <li><a href="temperature.html" class="active">Nhiệt độ</a></li>
                 <li><a href="soil-moisture.html">Độ ẩm đất</a></li>
                 <li><a href="ndvi.html">NDVI</a></li>
                 <li><a href="tvdi.html">TVDI</a></li>
             </ul>
+            <div id="userInfo"></div>
         </div>
     </nav>
 
@@ -286,6 +352,11 @@
                     🔍 Phân tích
                 </button>
             </div>
+        </div>
+        <div id="alertBanner" class="alert-banner" style="display:none;">
+            <div class="alert-title">🌡️ ĐÁNH GIÁ NHIỆT ĐỘ BỀ MẶT</div>
+            <div class="temp-level" id="tempLevel">--</div>
+            <p id="tempDesc" style="margin-top:10px; color:rgba(255,255,255,0.9);">--</p>
         </div>
 
         <div class="stats-grid">
@@ -367,6 +438,7 @@
 
     <script>
         const API = 'http://localhost:3000/api';
+        const PYTHON_API = 'http://localhost:3001';
         let charts = {};
         let geeOnline = false;
 
@@ -509,7 +581,8 @@
                 ]);
 
                 updateStats(daily.statistics);
-                drawDailyChart(daily.data);
+                updateAlert(daily.statistics);
+                drawDailyChart(daily.data);                
                 drawMonthlyChart(monthly.monthly_data);
                 drawRangeChart(monthly.monthly_data);
 
@@ -518,7 +591,101 @@
                 alert('Lỗi khi tải dữ liệu. Có thể chưa có dữ liệu cho khoảng thời gian này.');
             }
         }
+        function classifyTemperature(value) {
+    const v = parseFloat(value);
+    if (isNaN(v)) return { level: 'unknown', label: 'Không có dữ liệu', color: '#999', css: '' };
+    if (v < 20) return { level: 'cool', label: 'Mát / Lạnh', color: '#4ecdc4', css: 'level-cool' };
+    if (v < 30) return { level: 'normal', label: 'Bình thường', color: '#95e1d3', css: 'level-normal' };
+    if (v < 35) return { level: 'warm', label: 'Nóng', color: '#feca57', css: 'level-warm' };
+    if (v < 40) return { level: 'hot', label: 'Nóng cao', color: '#ff6b6b', css: 'level-hot' };
+    return { level: 'extreme', label: 'Nóng cực đoan', color: '#d73027', css: 'level-extreme' };
+}
 
+        function updateAlert(stats) {
+            const avgTemp = parseFloat(stats.average);
+            const cls = classifyTemperature(avgTemp);
+
+            document.getElementById('alertBanner').style.display = 'block';
+            const levelEl = document.getElementById('tempLevel');
+            levelEl.textContent = cls.label.toUpperCase();
+            levelEl.className = 'temp-level ' + cls.css;
+
+            let desc = '';
+            if (cls.level === 'cool') {
+                desc = `
+                    <strong>📌 Thực tế:</strong><br>
+                    • Thường xuất hiện khi có mưa, mây dày hoặc rừng xanh lớn<br>
+                    • Đất ẩm, bốc hơi thấp, cây sinh trưởng mạnh<br><br>
+                    
+                    <strong>🌱 Tác động:</strong><br>
+                    • Không gây stress cho cây trồng<br>
+                    • Tốt cho rừng và vùng trồng cây công nghiệp<br><br>
+                    
+                    <strong>🟦 Đánh giá:</strong> Nhiệt độ bề mặt thấp, điều kiện mát mẻ. 
+                    Cây trồng và thảm thực vật sinh trưởng ổn định.
+                `;
+            } else if (cls.level === 'normal') {
+                desc = `
+                    <strong>📌 Thực tế:</strong><br>
+                    • Nhiệt độ trung bình của nhiều vùng tại Việt Nam<br>
+                    • Đất duy trì ẩm độ hợp lý nếu có mưa từng đợt<br><br>
+                    
+                    <strong>🌱 Tác động:</strong><br>
+                    • Cây phát triển tốt, đặc biệt là lúa và hoa màu<br><br>
+                    
+                    <strong>🟩 Đánh giá:</strong> Nhiệt độ bề mặt ở mức bình thường. 
+                    Điều kiện lý tưởng cho sản xuất nông nghiệp và hệ sinh thái.
+                `;
+            } else if (cls.level === 'warm') {
+                desc = `
+                    <strong>📌 Thực tế:</strong><br>
+                    • Xuất hiện nhiều tại đô thị và vùng đất trống<br>
+                    • Bề mặt vật liệu (bê tông, nhựa đường) tích nhiệt mạnh<br>
+                    • Đất bốc hơi nhanh, giảm độ ẩm<br><br>
+                    
+                    <strong>🌱 Tác động:</strong><br>
+                    • Cây trồng bắt đầu stress nước<br>
+                    • Rừng và cỏ khô dễ bén lửa<br><br>
+                    
+                    <strong>🟧 Cảnh báo:</strong> Nhiệt độ cao. Đất mất ẩm nhanh, cây trồng dễ bị stress nước. 
+                    Nguy cơ cháy rừng tăng.
+                `;
+            } else if (cls.level === 'hot') {
+                desc = `
+                    <strong>📌 Thực tế:</strong><br>
+                    • Nhiệt độ cao, đất và cây bị stress nhiệt rõ rệt<br>
+                    • Bốc hơi rất mạnh, cần tưới thường xuyên<br>
+                    • Hiệu ứng đảo nhiệt đô thị nghiêm trọng<br><br>
+                    
+                    <strong>🌱 Tác động:</strong><br>
+                    • Cây trồng sinh trưởng chậm, có thể bị cháy lá<br>
+                    • Nguy cơ cháy rừng cao<br>
+                    • Ảnh hưởng sức khỏe người và động vật<br><br>
+                    
+                    <strong>⚠️ Cảnh báo:</strong> Nhiệt độ rất cao! Cần áp dụng biện pháp tưới tiêu và che phủ đất. 
+                    Cảnh báo cháy rừng mức cao.
+                `;
+            } else if (cls.level === 'extreme') {
+                desc = `
+                    <strong>📌 Thực tế:</strong><br>
+                    • Nhiều tỉnh miền Trung ghi nhận 50-60°C ở bề mặt trong mùa nắng nóng<br>
+                    • Nguy hiểm cho cả người và động vật<br>
+                    • Dấu hiệu rõ của hiệu ứng đảo nhiệt đô thị<br><br>
+                    
+                    <strong>🌱 Tác động nghiêm trọng:</strong><br>
+                    • Cây chết hàng loạt nếu thiếu nước<br>
+                    • Đất bị nứt, thoái hóa, mất hữu cơ<br>
+                    • Cháy rừng ở mức báo động cao nhất<br>
+                    • Ảnh hưởng nghiêm trọng sức khỏe cộng đồng<br><br>
+                    
+                    <strong>🆘 CẢNH BÁO KHẨN CẤP:</strong> Nhiệt độ bề mặt cực kỳ cao! 
+                    Nguy cơ hạn hán, cháy rừng và ảnh hưởng sức khỏe con người. 
+                    Cần áp dụng biện pháp giảm nhiệt và bảo vệ nguồn nước ngay lập tức.
+                `;
+            }
+
+            document.getElementById('tempDesc').innerHTML = desc;
+        }
         function updateStats(stats) {
             document.getElementById('avgTemp').textContent = stats.average + '°';
             document.getElementById('minTemp').textContent = stats.min + '°';
@@ -665,11 +832,20 @@
         }
 
         // Init
-        window.onload = () => {
+        window.onload = async () => {
+            const isValid = await AuthHelper.verifyToken();
+            if (!isValid) {
+                window.location.href = 'login.html';
+                return;
+            }
             loadLocations();
             checkGEEStatus();
             setInterval(checkGEEStatus, 30000);
+            
+            // Log activity
+            await AuthHelper.logActivity('page_view', 'temperature');
         };
     </script>
+     <script src="js/auth.js"></script>
 </body>
 </html>

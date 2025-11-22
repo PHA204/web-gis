@@ -28,6 +28,26 @@
             justify-content: space-between;
             align-items: center;
         }
+
+        #userInfo {
+            margin-left: auto;
+        }
+
+        #userInfo button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        #userInfo button:hover {
+            background: rgba(255,107,107,0.3);
+            transform: translateY(-2px);
+        }
         .logo {
             font-size: 1.5em;
             font-weight: bold;
@@ -221,7 +241,7 @@
         .level-moderate { background: #fddbc7; color: #333; }
         .level-severe { background: #ef8a62; }
         .level-extreme { background: #b2182b; }
-
+        
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -273,7 +293,23 @@
             height: 20px;
             border-radius: 4px;
         }
+        #droughtDesc {
+            margin-top: 15px;
+            color: rgba(255,255,255,0.95);
+            text-align: left;
+            line-height: 1.8;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
 
+        #droughtDesc strong {
+            color: #ff8c42;
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
         @media (max-width: 768px) {
             .dashboard { grid-template-columns: 1fr; }
             .control-row { flex-direction: column; }
@@ -284,15 +320,16 @@
 <body>
     <nav>
         <div class="nav-container">
-            <div class="logo">🌍 Web GIS</div>
+            <div class="logo" style="margin-right: 30px;">🌍 Trang chủ </div>
             <ul class="nav-links">
-                <li><a href="index.html">Dashboard</a></li>
+                <li><a href="index.html"  >Trang chủ</a></li>
                 <li><a href="rainfall.html">Lượng mưa</a></li>
                 <li><a href="temperature.html">Nhiệt độ</a></li>
                 <li><a href="soil-moisture.html">Độ ẩm đất</a></li>
                 <li><a href="ndvi.html">NDVI</a></li>
                 <li><a href="tvdi.html" class="active">TVDI</a></li>
             </ul>
+            <div id="userInfo"></div>
         </div>
     </nav>
 
@@ -422,6 +459,7 @@
 
     <script>
         const API = 'http://localhost:3000/api';
+        const PYTHON_API = 'http://localhost:3001'; 
         let charts = {};
         let geeOnline = false;
 
@@ -583,37 +621,87 @@
         }
 
         function updateAlert(stats) {
-            const tvdi = parseFloat(stats.average);
-            let level, levelClass, desc;
-            
-            if (tvdi < 0.2) {
-                level = 'ẨM ƯỚT';
-                levelClass = 'level-wet';
-                desc = 'Điều kiện ẩm ướt, không có nguy cơ hạn hán';
-            } else if (tvdi < 0.4) {
-                level = 'BÌNH THƯỜNG';
-                levelClass = 'level-normal';
-                desc = 'Điều kiện thời tiết bình thường';
-            } else if (tvdi < 0.6) {
-                level = 'HẠN NHẸ';
-                levelClass = 'level-moderate';
-                desc = 'Cần theo dõi sát sao, có thể ảnh hưởng đến cây trồng';
-            } else if (tvdi < 0.8) {
-                level = 'HẠN NẶNG';
-                levelClass = 'level-severe';
-                desc = 'Cảnh báo nghiêm trọng! Cần có biện pháp ứng phó ngay';
-            } else {
-                level = 'HẠN CỰC ĐOAN';
-                levelClass = 'level-extreme';
-                desc = 'Tình trạng khẩn cấp! Thiệt hại nghiêm trọng cho nông nghiệp';
-            }
+    const tvdi = parseFloat(stats.average);
+    let level, levelClass, desc, detail;
+    
+    if (tvdi < 0.2) {
+        level = 'ẨM ƯỚT';
+        levelClass = 'level-wet';
+        desc = 'Điều kiện ẩm ướt - Không có nguy cơ hạn hán';
+        detail = `
+            <strong>Mô tả chi tiết:</strong><br>
+            • Đất đang trong trạng thái ẩm dồi dào, hầu hết bề mặt đất bão hòa nước<br>
+            • Nhiệt độ đất thấp, quá trình bốc hơi diễn ra chậm<br>
+            • Thực vật phát triển mạnh, tán lá xanh, độ ẩm không khí cao<br><br>
+            <strong>Khuyến nghị:</strong> Tận dụng giai đoạn này để gieo trồng, chăm sóc hoặc phục hồi đất. Kiểm tra thoát nước nếu mưa kéo dài.
+        `;
+    } else if (tvdi < 0.4) {
+        level = 'BÌNH THƯỜNG';
+        levelClass = 'level-normal';
+        desc = 'Điều kiện thời tiết bình thường';
+        detail = `
+            <strong>Mô tả chi tiết:</strong><br>
+            • Độ ẩm đất ở mức ổn định, không quá khô cũng không quá ẩm<br>
+            • Cân bằng nước - nhiệt tốt, cây trồng không gặp stress nước<br>
+            • Mật độ thực vật ổn định, NDVI dao động mức trung bình - khá<br><br>
+            <strong>Khuyến nghị:</strong> Tiếp tục duy trì tưới tiêu theo mức thông thường. Theo dõi vùng đất cát vì dễ chuyển sang khô hạn.
+        `;
+    } else if (tvdi < 0.6) {
+        level = 'HẠN NHẸ';
+        levelClass = 'level-moderate';
+        desc = 'Cần theo dõi sát sao - Có thể ảnh hưởng đến cây trồng';
+        detail = `
+            <strong>Mô tả chi tiết:</strong><br>
+            • Độ ẩm đất bắt đầu giảm, bề mặt đất nóng nhanh hơn<br>
+            • Cây trồng có dấu hiệu giảm sinh trưởng nhẹ (vàng lá nhẹ, cuốn lá)<br>
+            • Khả năng giữ nước của đất thấp hơn, bốc hơi nhanh khi nhiệt độ cao<br><br>
+            <strong>Cảnh báo:</strong> Nếu không có mưa 5-7 ngày → dễ chuyển thành hạn cục bộ<br>
+            <strong>Khuyến nghị:</strong> Bắt đầu tăng tần suất tưới cho nông nghiệp. Đánh giá nguồn nước tưới.
+        `;
+    } else if (tvdi < 0.8) {
+        level = 'HẠN NẶNG';
+        levelClass = 'level-severe';
+        desc = '⚠️ Cảnh báo nghiêm trọng! Cần có biện pháp ứng phó ngay';
+        detail = `
+            <strong>Mô tả chi tiết:</strong><br>
+            • Đất mất ẩm rõ rệt, bề mặt xuất hiện nứt nẻ<br>
+            • Cây trồng stress nước mạnh, sinh trưởng chậm<br>
+            • Bốc hơi rất cao do nhiệt độ đất cao, màu sắc thực vật nhạt dần<br><br>
+            <strong>Ảnh hưởng:</strong><br>
+            • Giảm năng suất 15-30%<br>
+            • Cà phê, hồ tiêu, sắn, lúa có nguy cơ khô héo<br>
+            • Nguy cơ cháy rừng tăng đáng kể<br><br>
+            <strong>Khuyến nghị:</strong> Áp dụng tưới nhỏ giọt. Ưu tiên nước cho vùng sản xuất tập trung. Cảnh báo cháy rừng mức cao.
+        `;
+    } else {
+        level = 'HẠN CỰC ĐOAN';
+        levelClass = 'level-extreme';
+        desc = '🆘 Tình trạng khẩn cấp! Thiệt hại nghiêm trọng';
+        detail = `
+            <strong>Mô tả chi tiết:</strong><br>
+            • Đất ở trạng thái khô kiệt, gần như không còn ẩm bề mặt<br>
+            • Nhiệt độ đất cao, thậm chí trên 50°C<br>
+            • Cây trồng chậm phát triển hoặc chết hàng loạt nếu kéo dài<br>
+            • Đất dễ thoái hóa, mất chất hữu cơ<br><br>
+            <strong>Ảnh hưởng:</strong><br>
+            • Giảm năng suất >40%<br>
+            • Nguy cơ cháy rừng rất cao<br>
+            • Đe dọa nghiêm trọng hệ sinh thái<br>
+            • Nguồn nước sinh hoạt bị ảnh hưởng<br><br>
+            <strong>Khuyến nghị KHẨN CẤP:</strong><br>
+            • Ưu tiên nước cho sinh hoạt trước nông nghiệp<br>
+            • Dừng hoặc giãn lịch gieo trồng vụ mới<br>
+            • Tạo đường băng cản lửa ở rừng<br>
+            • Công bố cảnh báo hạn mặn/hạn hán cấp tỉnh
+        `;
+    }
 
-            document.getElementById('alertBanner').style.display = 'block';
-            const levelEl = document.getElementById('droughtLevel');
-            levelEl.textContent = level;
-            levelEl.className = 'drought-level ' + levelClass;
-            document.getElementById('droughtDesc').textContent = desc;
-        }
+    document.getElementById('alertBanner').style.display = 'block';
+    const levelEl = document.getElementById('droughtLevel');
+    levelEl.textContent = level;
+    levelEl.className = 'drought-level ' + levelClass;
+    document.getElementById('droughtDesc').innerHTML = desc + '<br><br>' + detail;
+}
 
         function drawTvdiChart(data) {
             const ctx = document.getElementById('tvdiChart');
@@ -753,11 +841,20 @@
         }
 
         // Init
-        window.onload = () => {
+        window.onload = async () => {
+            const isValid = await AuthHelper.verifyToken();
+            if (!isValid) {
+                window.location.href = 'login.html';
+                return;
+            }
             loadLocations();
             checkGEEStatus();
             setInterval(checkGEEStatus, 30000);
+            
+            // Log activity
+            await AuthHelper.logActivity('page_view', 'tvdi');
         };
     </script>
+     <script src="js/auth.js"></script>
 </body>
 </html>
