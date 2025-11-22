@@ -35,14 +35,49 @@ def initialize_gee():
             print(f"❌ GEE Error: {e}")
             return False
 
+PROVINCE_MAPPING = {
+    'Quảng Trị': 'Quang Tri',
+    'Quang Tri': 'Quang Tri',
+    'Thừa Thiên Huế': 'Thua Thien-Hue',
+    'Đà Nẵng': 'Da Nang',
+    'Quảng Nam': 'Quang Nam',
+    'Quảng Ngãi': 'Quang Ngai',
+    'Bình Định': 'Binh Dinh',
+    'Hà Nội': 'Ha Noi',
+    'Hồ Chí Minh': 'Ho Chi Minh city',
+    # Thêm các tỉnh khác nếu cần
+}
+
 # Get region geometry
 def get_region_geometry(province_name):
     try:
+        # Chuyển đổi tên tỉnh sang tên trong GAUL
+        gaul_name = PROVINCE_MAPPING.get(province_name, province_name)
+        print(f"🔍 Searching for province: {province_name} -> {gaul_name}")
+        
         gadm = ee.FeatureCollection("FAO/GAUL/2015/level1")
-        region = gadm.filter(ee.Filter.eq('ADM1_NAME', province_name))
+        
+        # Filter Vietnam first
+        vietnam = gadm.filter(ee.Filter.eq('ADM0_NAME', 'Viet Nam'))
+        
+        # Tìm tỉnh
+        region = vietnam.filter(ee.Filter.eq('ADM1_NAME', gaul_name))
         count = region.size().getInfo()
+        
         if count == 0:
+            # Thử tìm với tên gốc
+            region = vietnam.filter(ee.Filter.eq('ADM1_NAME', province_name))
+            count = region.size().getInfo()
+        
+        if count == 0:
+            # In ra danh sách tỉnh để debug
+            all_names = vietnam.aggregate_array('ADM1_NAME').getInfo()
+            print(f"❌ Province not found. Available provinces in Vietnam:")
+            for name in sorted(all_names):
+                print(f"   - {name}")
             return None
+            
+        print(f"✅ Found province: {gaul_name}")
         return region.geometry()
     except Exception as e:
         print(f"Error: {e}")
@@ -88,16 +123,19 @@ def get_rainfall_data(geometry, start_date, end_date, location_id):
 # TEMPERATURE
 def get_temperature_data(geometry, start_date, end_date, location_id):
     try:
+        # Thử ERA5_LAND trước (có dữ liệu mới hơn)
         collection = (
-            ee.ImageCollection("ECMWF/ERA5/DAILY")
+            ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
             .filterBounds(geometry)
             .filterDate(start_date, end_date)
-            .select(['mean_2m_air_temperature', 'minimum_2m_air_temperature', 
-                     'maximum_2m_air_temperature'])
+            .select(['temperature_2m', 'temperature_2m_min', 'temperature_2m_max'])
         )
         
         size = collection.size().getInfo()
+        print(f"📊 Temperature collection size: {size}")
+        
         if size == 0:
+            print("❌ No temperature data found for this period")
             return pd.DataFrame()
         
         def extract(img):
@@ -105,13 +143,13 @@ def get_temperature_data(geometry, start_date, end_date, location_id):
             stats = img.reduceRegion(
                 reducer=ee.Reducer.mean(),
                 geometry=geometry,
-                scale=25000,
+                scale=10000,
                 maxPixels=1e13
             )
             
-            t_mean = stats.get('mean_2m_air_temperature')
-            t_min = stats.get('minimum_2m_air_temperature')
-            t_max = stats.get('maximum_2m_air_temperature')
+            t_mean = stats.get('temperature_2m')
+            t_min = stats.get('temperature_2m_min')
+            t_max = stats.get('temperature_2m_max')
             
             return {
                 'location_id': location_id,
@@ -119,7 +157,7 @@ def get_temperature_data(geometry, start_date, end_date, location_id):
                 'temp_mean': round(t_mean.getInfo() - 273.15, 2) if t_mean else None,
                 'temp_min': round(t_min.getInfo() - 273.15, 2) if t_min else None,
                 'temp_max': round(t_max.getInfo() - 273.15, 2) if t_max else None,
-                'source': 'ERA5'
+                'source': 'ERA5-Land'
             }
         
         images = collection.toList(size)
@@ -128,7 +166,7 @@ def get_temperature_data(geometry, start_date, end_date, location_id):
     except Exception as e:
         print(f"Temperature error: {e}")
         return pd.DataFrame()
-
+    
 # SOIL MOISTURE
 def get_soil_moisture_data(geometry, start_date, end_date, location_id):
     try:
@@ -236,91 +274,140 @@ def get_ndvi_data(geometry, start_date, end_date, location_id):
         return pd.DataFrame()
 
 # TVDI
+# TVDI CHUẨN (Sandholt, 2002)
+# TVDI - Phiên bản đơn giản hóa và sửa lỗi
 def get_tvdi_data(geometry, start_date, end_date, location_id):
     try:
-        lst_collection = (
+        # Lấy LST từ MOD11A2
+        lst_col = (
             ee.ImageCollection("MODIS/061/MOD11A2")
             .filterBounds(geometry)
             .filterDate(start_date, end_date)
             .select(['LST_Day_1km'])
         )
         
-        lst_size = lst_collection.size().getInfo()
+        # Lấy NDVI từ MOD13Q1
+        ndvi_col = (
+            ee.ImageCollection("MODIS/061/MOD13Q1")
+            .filterBounds(geometry)
+            .filterDate(start_date, end_date)
+            .select(['NDVI'])
+        )
+        
+        lst_size = lst_col.size().getInfo()
+        print(f"📊 LST collection size: {lst_size}")
+        
         if lst_size == 0:
+            print("❌ No LST data found")
             return pd.DataFrame()
         
-        def calculate_tvdi(lst_img):
-            date = ee.Date(lst_img.get('system:time_start')).format('YYYY-MM-dd').getInfo()
-            lst = lst_img.select('LST_Day_1km').multiply(0.02).subtract(273.15)
-            
-            lst_stats = lst.reduceRegion(
-                reducer=ee.Reducer.mean()
-                    .combine(ee.Reducer.min(), '', True)
-                    .combine(ee.Reducer.max(), '', True),
-                geometry=geometry,
-                scale=1000,
-                maxPixels=1e13
-            )
-            
-            lst_mean = lst_stats.get('LST_Day_1km_mean')
-            lst_min = lst_stats.get('LST_Day_1km_min')
-            lst_max = lst_stats.get('LST_Day_1km_max')
-            
-            lst_range = ee.Number(lst_max).subtract(ee.Number(lst_min))
-            tvdi_img = lst.subtract(ee.Number(lst_min)).divide(lst_range)
-            
-            tvdi_stats = tvdi_img.reduceRegion(
-                reducer=ee.Reducer.mean()
-                    .combine(ee.Reducer.min(), '', True)
-                    .combine(ee.Reducer.max(), '', True),
-                geometry=geometry,
-                scale=1000,
-                maxPixels=1e13
-            )
-            
-            drought_mask = tvdi_img.gt(0.6)
-            drought_pct = drought_mask.reduceRegion(
-                reducer=ee.Reducer.mean(),
-                geometry=geometry,
-                scale=1000,
-                maxPixels=1e13
-            ).get('LST_Day_1km')
-            
-            tvdi_mean_val = tvdi_stats.get('LST_Day_1km_mean')
-            tvdi_min_val = tvdi_stats.get('LST_Day_1km_min')
-            tvdi_max_val = tvdi_stats.get('LST_Day_1km_max')
-            
-            def classify_drought(tvdi):
-                if tvdi is None:
-                    return 'unknown'
-                if tvdi < 0.2:
-                    return 'wet'
-                elif tvdi < 0.4:
-                    return 'normal'
-                elif tvdi < 0.6:
-                    return 'moderate'
-                elif tvdi < 0.8:
-                    return 'severe'
-                else:
-                    return 'extreme'
-            
-            tvdi_val_info = tvdi_mean_val.getInfo() if tvdi_mean_val else None
-            
-            return {
-                'location_id': location_id,
-                'date': date,
-                'tvdi_mean': round(tvdi_val_info, 4) if tvdi_val_info else None,
-                'tvdi_min': round(tvdi_min_val.getInfo(), 4) if tvdi_min_val else None,
-                'tvdi_max': round(tvdi_max_val.getInfo(), 4) if tvdi_max_val else None,
-                'lst_mean': round(lst_mean.getInfo(), 2) if lst_mean else None,
-                'drought_area_pct': round(drought_pct.getInfo() * 100, 2) if drought_pct else None,
-                'drought_class': classify_drought(tvdi_val_info),
-                'source': 'MODIS-LST-NDVI'
-            }
+        data = []
+        lst_list = lst_col.toList(lst_size)
         
-        lst_images = lst_collection.toList(lst_size)
-        data = [calculate_tvdi(ee.Image(lst_images.get(i))) for i in range(lst_size)]
+        for i in range(lst_size):
+            try:
+                lst_img = ee.Image(lst_list.get(i))
+                date = ee.Date(lst_img.get('system:time_start')).format('YYYY-MM-dd').getInfo()
+                print(f"  Processing: {date}")
+                
+                # Chuyển đổi LST sang độ C
+                lst = lst_img.select('LST_Day_1km').multiply(0.02).subtract(273.15)
+                
+                # Tính thống kê LST
+                lst_stats = lst.reduceRegion(
+                    reducer=ee.Reducer.mean()
+                        .combine(ee.Reducer.min(), '', True)
+                        .combine(ee.Reducer.max(), '', True),
+                    geometry=geometry,
+                    scale=1000,
+                    maxPixels=1e13
+                )
+                
+                lst_mean = lst_stats.get('LST_Day_1km_mean')
+                lst_min = lst_stats.get('LST_Day_1km_min')
+                lst_max = lst_stats.get('LST_Day_1km_max')
+                
+                lst_mean_val = lst_mean.getInfo() if lst_mean else None
+                lst_min_val = lst_min.getInfo() if lst_min else None
+                lst_max_val = lst_max.getInfo() if lst_max else None
+                
+                if lst_min_val is None or lst_max_val is None:
+                    print(f"    ⚠️ Skip {date}: No LST data")
+                    continue
+                
+                # Tính TVDI đơn giản: (LST - LST_min) / (LST_max - LST_min)
+                lst_range = lst_max_val - lst_min_val
+                if lst_range <= 0:
+                    print(f"    ⚠️ Skip {date}: LST range = 0")
+                    continue
+                
+                tvdi_img = lst.subtract(lst_min_val).divide(lst_range)
+                
+                # Thống kê TVDI
+                tvdi_stats = tvdi_img.reduceRegion(
+                    reducer=ee.Reducer.mean()
+                        .combine(ee.Reducer.min(), '', True)
+                        .combine(ee.Reducer.max(), '', True),
+                    geometry=geometry,
+                    scale=1000,
+                    maxPixels=1e13
+                )
+                
+                tvdi_mean = tvdi_stats.get('LST_Day_1km_mean')
+                tvdi_min = tvdi_stats.get('LST_Day_1km_min')
+                tvdi_max = tvdi_stats.get('LST_Day_1km_max')
+                
+                tvdi_mean_val = tvdi_mean.getInfo() if tvdi_mean else None
+                tvdi_min_val = tvdi_min.getInfo() if tvdi_min else None
+                tvdi_max_val = tvdi_max.getInfo() if tvdi_max else None
+                
+                # Tính diện tích hạn (TVDI > 0.6)
+                drought_mask = tvdi_img.gt(0.6)
+                drought_pct = drought_mask.reduceRegion(
+                    reducer=ee.Reducer.mean(),
+                    geometry=geometry,
+                    scale=1000,
+                    maxPixels=1e13
+                ).get('LST_Day_1km')
+                drought_pct_val = drought_pct.getInfo() if drought_pct else 0
+                
+                # Phân loại hạn
+                def classify_drought(tvdi):
+                    if tvdi is None:
+                        return 'unknown'
+                    if tvdi < 0.2:
+                        return 'wet'
+                    elif tvdi < 0.4:
+                        return 'normal'
+                    elif tvdi < 0.6:
+                        return 'moderate'
+                    elif tvdi < 0.8:
+                        return 'severe'
+                    else:
+                        return 'extreme'
+                
+                record = {
+                    'location_id': location_id,
+                    'date': date,
+                    'tvdi_mean': round(tvdi_mean_val, 4) if tvdi_mean_val else None,
+                    'tvdi_min': round(tvdi_min_val, 4) if tvdi_min_val else None,
+                    'tvdi_max': round(tvdi_max_val, 4) if tvdi_max_val else None,
+                    'lst_mean': round(lst_mean_val, 2) if lst_mean_val else None,
+                    'drought_area_pct': round(drought_pct_val * 100, 2) if drought_pct_val else 0,
+                    'drought_class': classify_drought(tvdi_mean_val),
+                    'source': 'MODIS-LST-TVDI'
+                }
+                
+                data.append(record)
+                print(f"    ✅ {date}: TVDI={tvdi_mean_val:.4f}, LST={lst_mean_val:.2f}°C")
+                
+            except Exception as e:
+                print(f"    ❌ Error processing image {i}: {e}")
+                continue
+        
+        print(f"📊 Total records: {len(data)}")
         return pd.DataFrame(data)
+        
     except Exception as e:
         print(f"TVDI error: {e}")
         return pd.DataFrame()

@@ -300,7 +300,7 @@
     <div class="container">
         <div class="page-header">
             <div class="page-title">🌱 Phân tích NDVI - Thảm thực vật</div>
-            <p class="page-subtitle">Normalized Difference Vegetation Index (MODIS / Sentinel)</p>
+            <p class="page-subtitle">Normalized Difference Vegetation Index (MODIS)</p>
             <div id="geeStatus" class="gee-status offline">
                 ⏳ Đang kiểm tra GEE service...
             </div>
@@ -392,7 +392,7 @@
             <div class="modal-title">🌍 Tải dữ liệu NDVI từ Google Earth Engine</div>
             <div class="modal-body">
                 <p style="color: rgba(255,255,255,0.7); margin-bottom: 15px;">
-                    🌱 Tải dữ liệu NDVI cho khoảng thời gian đã chọn (MODIS / Sentinel)
+                    🌱 Tải dữ liệu NDVI cho khoảng thời gian đã chọn (MODIS)
                 </p>
                 <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <div style="margin-bottom: 8px;">
@@ -424,13 +424,14 @@
 
     <script>
         const API = 'http://localhost:3000/api';
+        const PYTHON_API = 'http://localhost:3001';
         let charts = {};
         let geeOnline = false;
 
         // Kiểm tra GEE service
         async function checkGEEStatus() {
             try {
-                const res = await fetch(`${API}/gee/status`);
+                const res = await fetch(`${PYTHON_API}/status`);
                 const data = await res.json();
                 
                 const statusEl = document.getElementById('geeStatus');
@@ -500,7 +501,7 @@
                 progressFill.style.width = '30%';
                 progressFill.textContent = '30%';
 
-                const response = await fetch(`${API}/gee/fetch`, {
+                const response = await fetch(`${PYTHON_API}/fetch-data`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -543,7 +544,7 @@
                 progressFill.textContent = '0%';
                 logEl.innerHTML = `<div class="log-item" style="color: #f44336;">❌ Lỗi: ${err.message}</div>`;
                 
-                if (err.message.includes('ECONNREFUSED')) {
+                if (err.message.includes('ECONNREFUSED') || err.message.includes('Failed to fetch')) {
                     logEl.innerHTML += '<div class="log-item" style="color: #ffa726;">⚠️ Python API không chạy. Vui lòng chạy: python api_server.py</div>';
                 }
             } finally {
@@ -576,10 +577,12 @@
         }
 
         function updateStats(stats) {
-            document.getElementById('avgNdvi').textContent = stats.average;
-            document.getElementById('minNdvi').textContent = stats.min_ndvi;
-            document.getElementById('maxNdvi').textContent = stats.max_ndvi;
-            document.getElementById('vegAreaPct').textContent = stats.avg_veg_pct + '%';
+            document.getElementById('avgNdvi').textContent = stats.average || '--';
+            document.getElementById('minNdvi').textContent = stats.min || '--';
+            document.getElementById('maxNdvi').textContent = stats.max || '--';
+            // Sửa tên trường: avg_veg_pct hoặc avg_vegetation_pct
+            const vegPct = stats.avg_veg_pct || stats.avg_vegetation_pct || '--';
+            document.getElementById('vegAreaPct').textContent = vegPct + (vegPct !== '--' ? '%' : '');
         }
 
         function classifyNdvi(value) {
@@ -772,12 +775,3 @@
     </script>
 </body>
 </html>
- 
-
-
-
-
-
-
-
-

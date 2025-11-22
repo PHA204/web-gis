@@ -299,7 +299,7 @@
     <div class="container">
         <div class="page-header">
             <div class="page-title">💧 Phân tích độ ẩm đất</div>
-            <p class="page-subtitle">Soil Moisture: Surface, Rootzone, Profile</p>
+            <p class="page-subtitle">Soil Moisture: Surface, Rootzone (ERA5-Land)</p>
             <div id="geeStatus" class="gee-status offline">
                 ⏳ Đang kiểm tra GEE service...
             </div>
@@ -348,11 +348,6 @@
                 <div class="stat-label">Độ ẩm tầng rễ TB (0.1–0.4 m)</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">🟫</div>
-                <div class="stat-value" id="avgProfile">--</div>
-                <div class="stat-label">Độ ẩm toàn tầng đất TB</div>
-            </div>
-            <div class="stat-card">
                 <div class="stat-icon">📊</div>
                 <div class="stat-value" id="dataPoints">--</div>
                 <div class="stat-label">Số ngày có dữ liệu</div>
@@ -366,7 +361,6 @@
                 <div class="legend">
                     <div class="legend-item"><div class="legend-color" style="background:#4fc3f7"></div>Bề mặt (sm_surface)</div>
                     <div class="legend-item"><div class="legend-color" style="background:#81c784"></div>Tầng rễ (sm_rootzone)</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#ffb74d"></div>Toàn tầng (sm_profile)</div>
                 </div>
             </div>
 
@@ -388,7 +382,7 @@
             <div class="modal-title">🌍 Tải dữ liệu độ ẩm đất từ Google Earth Engine</div>
             <div class="modal-body">
                 <p style="color: rgba(255,255,255,0.7); margin-bottom: 15px;">
-                    💧 Tải dữ liệu Soil Moisture (Surface, Rootzone, Profile) cho khoảng thời gian đã chọn
+                    💧 Tải dữ liệu Soil Moisture (Surface, Rootzone) cho khoảng thời gian đã chọn
                 </p>
                 <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <div style="margin-bottom: 8px;">
@@ -398,7 +392,7 @@
                         <strong>📅 Thời gian:</strong> <span id="modalPeriod">--</span>
                     </div>
                     <div>
-                        <strong>📊 Dữ liệu:</strong> Soil Moisture (sm_surface, sm_rootzone, sm_profile)
+                        <strong>📊 Dữ liệu:</strong> Soil Moisture (sm_surface, sm_rootzone)
                     </div>
                 </div>
 
@@ -420,12 +414,13 @@
 
     <script>
         const API = 'http://localhost:3000/api';
+        const PYTHON_API = 'http://localhost:3001';
         let charts = {};
         let geeOnline = false;
 
         async function checkGEEStatus() {
             try {
-                const res = await fetch(`${API}/gee/status`);
+                const res = await fetch(`${PYTHON_API}/status`);
                 const data = await res.json();
                 
                 const statusEl = document.getElementById('geeStatus');
@@ -494,7 +489,7 @@
                 progressFill.style.width = '30%';
                 progressFill.textContent = '30%';
 
-                const response = await fetch(`${API}/gee/fetch`, {
+                const response = await fetch(`${PYTHON_API}/fetch-data`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -537,7 +532,7 @@
                 progressFill.textContent = '0%';
                 logEl.innerHTML = `<div class="log-item" style="color: #f44336;">❌ Lỗi: ${err.message}</div>`;
                 
-                if (err.message.includes('ECONNREFUSED')) {
+                if (err.message.includes('ECONNREFUSED') || err.message.includes('Failed to fetch')) {
                     logEl.innerHTML += '<div class="log-item" style="color: #ffa726;">⚠️ Python API không chạy. Vui lòng chạy: python api_server.py</div>';
                 }
             } finally {
@@ -570,10 +565,9 @@
         }
 
         function updateStats(stats) {
-            document.getElementById('avgSurface').textContent = stats.avg_surface;
-            document.getElementById('avgRootzone').textContent = stats.avg_rootzone;
-            document.getElementById('avgProfile').textContent = stats.avg_profile;
-            document.getElementById('dataPoints').textContent = stats.data_points || '--';
+            document.getElementById('avgSurface').textContent = stats.average_surface || '--';
+            document.getElementById('avgRootzone').textContent = stats.average_rootzone || '--';
+            document.getElementById('dataPoints').textContent = stats.days || '--';
         }
 
         function classifySoilMoisture(value) {
@@ -587,7 +581,7 @@
         }
 
         function updateAlert(stats) {
-            const sm = parseFloat(stats.avg_surface);
+            const sm = parseFloat(stats.average_surface);
             const cls = classifySoilMoisture(sm);
 
             document.getElementById('alertBanner').style.display = 'block';
@@ -627,14 +621,6 @@
                             data: data.map(d => d.sm_rootzone),
                             borderColor: '#81c784',
                             backgroundColor: 'rgba(129,199,132,0.1)',
-                            fill: true,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Toàn tầng (sm_profile)',
-                            data: data.map(d => d.sm_profile),
-                            borderColor: '#ffb74d',
-                            backgroundColor: 'rgba(255,183,77,0.1)',
                             fill: true,
                             tension: 0.4
                         }
@@ -681,11 +667,6 @@
                             label: 'Tầng rễ',
                             data: data.map(d => d.avg_rootzone),
                             backgroundColor: '#81c784'
-                        },
-                        {
-                            label: 'Toàn tầng',
-                            data: data.map(d => d.avg_profile),
-                            backgroundColor: '#ffb74d'
                         }
                     ]
                 },
