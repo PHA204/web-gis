@@ -35,6 +35,22 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            list-style: none;
+        }
+        .nav-links a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover, .nav-links a.active {
+            background: rgba(255,255,255,0.1);
+            color: #00d9ff;
+        }
 
         .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
         
@@ -53,6 +69,7 @@
             align-items: center;
             gap: 10px;
         }
+        .page-subtitle { color: rgba(255,255,255,0.7); }
 
         .controls {
             background: rgba(255,255,255,0.05);
@@ -107,6 +124,7 @@
             padding: 12px 20px;
             border-radius: 8px;
             font-size: 0.9em;
+            margin-top: 15px;
         }
         .gee-status.online {
             background: rgba(76, 175, 80, 0.2);
@@ -195,21 +213,53 @@
             border: 1px solid rgba(255,255,255,0.1);
             border-left: 4px solid #00d9ff;
         }
+        .stat-icon { font-size: 2em; margin-bottom: 10px; }
         .stat-value { font-size: 2em; font-weight: bold; margin-bottom: 5px; color: #00d9ff; }
         .stat-label { font-size: 0.9em; color: rgba(255,255,255,0.6); }
+
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card-title {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .full-width { grid-column: 1 / -1; }
+        canvas { max-height: 350px; }
+
+        @media (max-width: 768px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .control-row { flex-direction: column; }
+            .nav-links { display: none; }
+        }
     </style>
 </head>
 <body>
     <nav>
         <div class="nav-container">
             <div class="logo">🌍 Web GIS</div>
+            <ul class="nav-links">
+                <li><a href="index.html">Dashboard</a></li>
+                <li><a href="rainfall.html" class="active">Lượng mưa</a></li>
+                <li><a href="temperature.html">Nhiệt độ</a></li>
+                <li><a href="soil-moisture.html">Độ ẩm đất</a></li>
+                <li><a href="ndvi.html">NDVI</a></li>
+                <li><a href="tvdi.html">TVDI</a></li>
+            </ul>
         </div>
     </nav>
 
     <div class="container">
         <div class="page-header">
-            <div class="page-title">🌧️ Phân tích Lượng mưa với GEE Integration</div>
-            <div id="geeStatus" class="gee-status offline" style="margin-top: 15px;">
+            <div class="page-title">🌧️ Phân tích Lượng mưa</div>
+            <p class="page-subtitle">Dữ liệu từ CHIRPS (Climate Hazards Group InfraRed Precipitation with Station data)</p>
+            <div id="geeStatus" class="gee-status offline">
                 ⏳ Đang kiểm tra GEE service...
             </div>
         </div>
@@ -234,27 +284,48 @@
                     🌍 Tải từ GEE
                 </button>
                 <button class="btn-primary" onclick="loadData()">
-                    🔍 Xem dữ liệu
+                    🔍 Phân tích
                 </button>
             </div>
         </div>
 
         <div class="stats-grid">
             <div class="stat-card">
+                <div class="stat-icon">💧</div>
                 <div class="stat-value" id="totalRain">--</div>
                 <div class="stat-label">Tổng lượng mưa (mm)</div>
             </div>
             <div class="stat-card">
+                <div class="stat-icon">📊</div>
                 <div class="stat-value" id="avgRain">--</div>
                 <div class="stat-label">Trung bình (mm/ngày)</div>
             </div>
             <div class="stat-card">
+                <div class="stat-icon">⬆️</div>
                 <div class="stat-value" id="maxRain">--</div>
                 <div class="stat-label">Lượng mưa lớn nhất (mm)</div>
             </div>
             <div class="stat-card">
+                <div class="stat-icon">📅</div>
                 <div class="stat-value" id="rainyDays">--</div>
-                <div class="stat-label">Số ngày có dữ liệu</div>
+                <div class="stat-label">Số ngày có mưa</div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card full-width">
+                <div class="card-title">📈 Biểu đồ lượng mưa theo thời gian</div>
+                <canvas id="dailyChart"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 Thống kê theo tháng</div>
+                <canvas id="monthlyChart"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 Phân bố lượng mưa</div>
+                <canvas id="distributionChart"></canvas>
             </div>
         </div>
     </div>
@@ -262,32 +333,21 @@
     <!-- Modal Fetch từ GEE -->
     <div id="fetchModal" class="modal">
         <div class="modal-content">
-            <div class="modal-title">🌍 Tải dữ liệu từ Google Earth Engine</div>
+            <div class="modal-title">🌍 Tải dữ liệu Lượng mưa từ Google Earth Engine</div>
             <div class="modal-body">
                 <p style="color: rgba(255,255,255,0.7); margin-bottom: 15px;">
-                    Chọn loại dữ liệu cần tải:
+                    🌧️ Tải dữ liệu lượng mưa từ CHIRPS cho khoảng thời gian đã chọn
                 </p>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" value="rainfall" checked>
-                        <span>🌧️ Lượng mưa (CHIRPS)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" value="temperature">
-                        <span>🌡️ Nhiệt độ (ERA5)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" value="soil_moisture">
-                        <span>💧 Độ ẩm đất (ERA5-Land)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" value="ndvi">
-                        <span>🌿 NDVI (MODIS)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" value="tvdi">
-                        <span>🔥 TVDI (MODIS)</span>
-                    </label>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="margin-bottom: 8px;">
+                        <strong>📍 Địa điểm:</strong> <span id="modalLocation">--</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <strong>📅 Thời gian:</strong> <span id="modalPeriod">--</span>
+                    </div>
+                    <div>
+                        <strong>📊 Dữ liệu:</strong> Lượng mưa (CHIRPS)
+                    </div>
                 </div>
 
                 <div id="fetchProgress" style="display: none;">
@@ -308,6 +368,7 @@
 
     <script>
         const API = 'http://localhost:3000/api';
+        let charts = {};
         let geeOnline = false;
 
         // Kiểm tra GEE service
@@ -319,7 +380,7 @@
                 const statusEl = document.getElementById('geeStatus');
                 if (data.status === 'online' && data.gee_initialized) {
                     statusEl.className = 'gee-status online';
-                    statusEl.innerHTML = '✅ GEE Service: Online';
+                    statusEl.innerHTML = '✅ GEE Service: Online - Sẵn sàng tải dữ liệu';
                     geeOnline = true;
                     document.getElementById('btnFetch').disabled = false;
                 } else {
@@ -331,7 +392,7 @@
             } catch (err) {
                 const statusEl = document.getElementById('geeStatus');
                 statusEl.className = 'gee-status offline';
-                statusEl.innerHTML = '❌ GEE Service: Không kết nối được';
+                statusEl.innerHTML = '❌ GEE Service: Không kết nối được - Chạy: python api_server.py';
                 geeOnline = false;
                 document.getElementById('btnFetch').disabled = true;
             }
@@ -343,6 +404,14 @@
                 alert('GEE Service chưa sẵn sàng. Vui lòng chạy: python api_server.py');
                 return;
             }
+            
+            const locationEl = document.getElementById('location');
+            const locationName = locationEl.options[locationEl.selectedIndex].text;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            document.getElementById('modalLocation').textContent = locationName;
+            document.getElementById('modalPeriod').textContent = `${start} đến ${end}`;
             document.getElementById('fetchModal').classList.add('show');
         }
 
@@ -361,15 +430,6 @@
             const start_date = document.getElementById('startDate').value;
             const end_date = document.getElementById('endDate').value;
 
-            // Get selected data types
-            const checkboxes = document.querySelectorAll('#fetchModal input[type="checkbox"]:checked');
-            const data_types = Array.from(checkboxes).map(cb => cb.value);
-
-            if (data_types.length === 0) {
-                alert('Vui lòng chọn ít nhất một loại dữ liệu');
-                return;
-            }
-
             // Show progress
             document.getElementById('fetchProgress').style.display = 'block';
             document.getElementById('btnStartFetch').disabled = true;
@@ -377,11 +437,15 @@
             const logEl = document.getElementById('fetchLog');
             const progressFill = document.getElementById('progressFill');
             
-            logEl.innerHTML = '<div class="log-item">⏳ Đang kết nối GEE...</div>';
+            logEl.innerHTML = '<div class="log-item">⏳ Đang kết nối với GEE...</div>';
             progressFill.style.width = '10%';
             progressFill.textContent = '10%';
 
             try {
+                logEl.innerHTML += '<div class="log-item">🌍 Đang truy vấn dữ liệu CHIRPS...</div>';
+                progressFill.style.width = '30%';
+                progressFill.textContent = '30%';
+
                 const response = await fetch(`${API}/gee/fetch`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -390,13 +454,13 @@
                         location_id: parseInt(location_id),
                         start_date,
                         end_date,
-                        data_types
+                        data_types: ['rainfall'] // Chỉ tải lượng mưa
                     })
                 });
 
-                progressFill.style.width = '50%';
-                progressFill.textContent = '50%';
-                logEl.innerHTML += '<div class="log-item">⏳ Đang xử lý dữ liệu...</div>';
+                progressFill.style.width = '60%';
+                progressFill.textContent = '60%';
+                logEl.innerHTML += '<div class="log-item">💾 Đang lưu vào database...</div>';
 
                 const result = await response.json();
 
@@ -404,24 +468,30 @@
                     progressFill.style.width = '100%';
                     progressFill.textContent = '100%';
                     
-                    let logHtml = '<div class="log-item">✅ Hoàn thành!</div>';
-                    Object.keys(result.results).forEach(key => {
-                        const records = result.results[key].records;
-                        logHtml += `<div class="log-item">📊 ${key}: ${records} bản ghi</div>`;
-                    });
-                    logEl.innerHTML = logHtml;
+                    const records = result.results.rainfall?.records || 0;
+                    logEl.innerHTML = `
+                        <div class="log-item">✅ Hoàn thành!</div>
+                        <div class="log-item">📊 Đã tải: ${records} bản ghi lượng mưa</div>
+                        <div class="log-item">📍 Khu vực: ${result.province}</div>
+                        <div class="log-item">📅 Thời gian: ${result.period}</div>
+                    `;
 
                     setTimeout(() => {
                         closeFetchModal();
                         loadData(); // Auto reload data
                     }, 2000);
                 } else {
-                    throw new Error(result.message || 'Unknown error');
+                    throw new Error(result.error || result.message || 'Unknown error');
                 }
 
             } catch (err) {
                 progressFill.style.width = '0%';
+                progressFill.textContent = '0%';
                 logEl.innerHTML = `<div class="log-item" style="color: #f44336;">❌ Lỗi: ${err.message}</div>`;
+                
+                if (err.message.includes('ECONNREFUSED')) {
+                    logEl.innerHTML += '<div class="log-item" style="color: #ffa726;">⚠️ Python API không chạy. Vui lòng chạy: python api_server.py</div>';
+                }
             } finally {
                 document.getElementById('btnStartFetch').disabled = false;
             }
@@ -432,24 +502,166 @@
             const locId = document.getElementById('location').value;
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
+            const year = start.split('-')[0];
 
             try {
-                const res = await fetch(`${API}/rainfall?location_id=${locId}&start=${start}&end=${end}`);
-                const data = await res.json();
+                const [daily, monthly] = await Promise.all([
+                    fetch(`${API}/rainfall?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/rainfall/monthly?location_id=${locId}&year=${year}`).then(r=>r.json())
+                ]);
 
-                document.getElementById('totalRain').textContent = data.statistics.total;
-                document.getElementById('avgRain').textContent = data.statistics.average;
-                document.getElementById('maxRain').textContent = data.statistics.max;
-                document.getElementById('rainyDays').textContent = data.statistics.days;
+                updateStats(daily.statistics);
+                drawDailyChart(daily.data);
+                drawMonthlyChart(monthly.monthly_data);
+                drawDistributionChart(daily.data);
 
             } catch (err) {
                 console.error('Error:', err);
-                alert('Lỗi khi tải dữ liệu');
+                alert('Lỗi khi tải dữ liệu. Có thể chưa có dữ liệu cho khoảng thời gian này.');
+            }
+        }
+
+        function updateStats(stats) {
+            document.getElementById('totalRain').textContent = stats.total;
+            document.getElementById('avgRain').textContent = stats.average;
+            document.getElementById('maxRain').textContent = stats.max;
+            document.getElementById('rainyDays').textContent = stats.days || 0;
+        }
+
+        function drawDailyChart(data) {
+            const ctx = document.getElementById('dailyChart');
+            if (charts.daily) charts.daily.destroy();
+
+            charts.daily = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{
+                        label: 'Lượng mưa (mm)',
+                        data: data.map(d => d.rainfall_mm),
+                        backgroundColor: '#00d9ff',
+                        borderColor: '#00d9ff',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `Lượng mưa: ${context.parsed.y} mm`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#999', maxTicksLimit: 15 },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: { 
+                            ticks: { color: '#999' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            beginAtZero: true,
+                            title: { display: true, text: 'mm', color: '#999' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawMonthlyChart(data) {
+            const ctx = document.getElementById('monthlyChart');
+            if (charts.monthly) charts.monthly.destroy();
+
+            const monthNames = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+
+            charts.monthly = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => monthNames[d.month - 1]),
+                    datasets: [{
+                        label: 'Tổng mưa (mm)',
+                        data: data.map(d => d.total),
+                        backgroundColor: '#00d9ff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { labels: { color: '#fff' } } },
+                    scales: {
+                        x: { ticks: { color: '#999' }, grid: { display: false } },
+                        y: { 
+                            ticks: { color: '#999' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawDistributionChart(data) {
+            const ctx = document.getElementById('distributionChart');
+            if (charts.dist) charts.dist.destroy();
+
+            const labels = ['0-5mm', '5-10mm', '10-20mm', '20-50mm', '50-100mm', '>100mm'];
+            const counts = new Array(labels.length).fill(0);
+
+            data.forEach(d => {
+                const val = parseFloat(d.rainfall_mm);
+                if (val < 5) counts[0]++;
+                else if (val < 10) counts[1]++;
+                else if (val < 20) counts[2]++;
+                else if (val < 50) counts[3]++;
+                else if (val < 100) counts[4]++;
+                else counts[5]++;
+            });
+
+            charts.dist = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: [
+                            '#4ecdc4',
+                            '#45b7d1',
+                            '#3498db',
+                            '#2980b9',
+                            '#1e6fa8',
+                            '#155a8a'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { 
+                            position: 'bottom',
+                            labels: { color: '#fff' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadLocations() {
+            try {
+                const res = await fetch(`${API}/locations`);
+                const data = await res.json();
+                const sel = document.getElementById('location');
+                sel.innerHTML = data.map(l => 
+                    `<option value="${l.id}" data-province="${l.province}">${l.name}</option>`
+                ).join('');
+            } catch (e) { 
+                console.log('Using default location'); 
             }
         }
 
         // Init
         window.onload = () => {
+            loadLocations();
             checkGEEStatus();
             setInterval(checkGEEStatus, 30000); // Check every 30s
         };

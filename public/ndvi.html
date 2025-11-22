@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phân tích TVDI - Hạn hán - Web GIS</title>
+    <title>Phân tích NDVI - Thảm thực vật - Web GIS</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -60,7 +60,7 @@
             padding: 25px;
             border-radius: 15px;
             margin-bottom: 20px;
-            border-left: 4px solid #ff8c42;
+            border-left: 4px solid #00ff88;
         }
         .page-title {
             font-size: 2em;
@@ -119,8 +119,8 @@
             transition: all 0.3s;
         }
         .btn-primary { 
-            background: linear-gradient(135deg, #ff8c42, #ff6b35); 
-            color: #fff;
+            background: linear-gradient(135deg, #00ff88, #00d9ff); 
+            color: #001219;
         }
         .btn-secondary {
             background: linear-gradient(135deg, #667eea, #764ba2);
@@ -128,7 +128,7 @@
         }
         button:hover { 
             transform: translateY(-2px); 
-            box-shadow: 0 5px 20px rgba(255,140,66,0.4); 
+            box-shadow: 0 5px 20px rgba(0,255,136,0.4); 
         }
         button:disabled {
             opacity: 0.5;
@@ -155,12 +155,12 @@
             border-radius: 15px;
             max-width: 500px;
             width: 90%;
-            border: 2px solid #ff8c42;
+            border: 2px solid #00ff88;
         }
         .modal-title {
             font-size: 1.5em;
             margin-bottom: 20px;
-            color: #ff8c42;
+            color: #00ff88;
         }
         .modal-body { margin-bottom: 20px; }
         .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
@@ -175,7 +175,7 @@
         }
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #ff8c42, #ff6b35);
+            background: linear-gradient(90deg, #00ff88, #00d9ff);
             width: 0%;
             transition: width 0.3s;
             display: flex;
@@ -200,15 +200,15 @@
         }
 
         .alert-banner {
-            background: linear-gradient(135deg, rgba(255,140,66,0.2), rgba(255,107,107,0.2));
-            border: 2px solid #ff8c42;
+            background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,217,255,0.2));
+            border: 2px solid #00ff88;
             border-radius: 15px;
             padding: 20px;
             margin-bottom: 20px;
             text-align: center;
         }
-        .alert-title { font-size: 1.3em; font-weight: bold; margin-bottom: 10px; color: #ff8c42; }
-        .drought-level {
+        .alert-title { font-size: 1.3em; font-weight: bold; margin-bottom: 10px; color: #00ff88; }
+        .veg-level {
             display: inline-block;
             padding: 10px 25px;
             border-radius: 25px;
@@ -216,11 +216,12 @@
             font-size: 1.2em;
             margin: 10px 0;
         }
-        .level-wet { background: #2166ac; }
-        .level-normal { background: #67a9cf; }
-        .level-moderate { background: #fddbc7; color: #333; }
-        .level-severe { background: #ef8a62; }
-        .level-extreme { background: #b2182b; }
+        .level-water { background: #0571b0; }
+        .level-bare { background: #ca0020; }
+        .level-sparse { background: #f4a582; color:#333; }
+        .level-moderate { background: #92c5de; color:#333; }
+        .level-dense { background: #4dac26; }
+        .level-very-dense { background: #1b7837; }
 
         .stats-grid {
             display: grid;
@@ -233,10 +234,10 @@
             border-radius: 12px;
             padding: 20px;
             border: 1px solid rgba(255,255,255,0.1);
-            border-left: 4px solid #ff8c42;
+            border-left: 4px solid #00ff88;
         }
         .stat-icon { font-size: 2em; margin-bottom: 10px; }
-        .stat-value { font-size: 2em; font-weight: bold; margin-bottom: 5px; color: #ff8c42; }
+        .stat-value { font-size: 2em; font-weight: bold; margin-bottom: 5px; color: #00ff88; }
         .stat-label { font-size: 0.9em; color: rgba(255,255,255,0.6); }
         
         .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -290,16 +291,16 @@
                 <li><a href="rainfall.html">Lượng mưa</a></li>
                 <li><a href="temperature.html">Nhiệt độ</a></li>
                 <li><a href="soil-moisture.html">Độ ẩm đất</a></li>
-                <li><a href="ndvi.html">NDVI</a></li>
-                <li><a href="tvdi.html" class="active">TVDI</a></li>
+                <li><a href="ndvi.html" class="active">NDVI</a></li>
+                <li><a href="tvdi.html">TVDI</a></li>
             </ul>
         </div>
     </nav>
 
     <div class="container">
         <div class="page-header">
-            <div class="page-title">🔥 Phân tích TVDI - Chỉ số Hạn hán</div>
-            <p class="page-subtitle">Temperature Vegetation Dryness Index (MODIS LST & NDVI)</p>
+            <div class="page-title">🌱 Phân tích NDVI - Thảm thực vật</div>
+            <p class="page-subtitle">Normalized Difference Vegetation Index (MODIS / Sentinel)</p>
             <div id="geeStatus" class="gee-status offline">
                 ⏳ Đang kiểm tra GEE service...
             </div>
@@ -331,54 +332,55 @@
         </div>
 
         <div id="alertBanner" class="alert-banner" style="display:none;">
-            <div class="alert-title">⚠️ CẢNH BÁO HẠN HÁN</div>
-            <div class="drought-level" id="droughtLevel">--</div>
-            <p id="droughtDesc" style="margin-top:10px; color:rgba(255,255,255,0.9);">--</p>
+            <div class="alert-title">🌿 MỨC ĐỘ CHE PHỦ THỰC VẬT</div>
+            <div class="veg-level" id="vegLevel">--</div>
+            <p id="vegDesc" style="margin-top:10px; color:rgba(255,255,255,0.9);">--</p>
         </div>
 
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon">📊</div>
-                <div class="stat-value" id="avgTvdi">--</div>
-                <div class="stat-label">TVDI trung bình</div>
+                <div class="stat-value" id="avgNdvi">--</div>
+                <div class="stat-label">NDVI trung bình</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">🌡️</div>
-                <div class="stat-value" id="avgLst">--</div>
-                <div class="stat-label">Nhiệt độ bề mặt TB (°C)</div>
+                <div class="stat-icon">📉</div>
+                <div class="stat-value" id="minNdvi">--</div>
+                <div class="stat-label">NDVI thấp nhất</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">🔍</div>
-                <div class="stat-value" id="droughtPct">--</div>
-                <div class="stat-label">Diện tích hạn (%)</div>
+                <div class="stat-icon">📈</div>
+                <div class="stat-value" id="maxNdvi">--</div>
+                <div class="stat-label">NDVI cao nhất</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">⚠️</div>
-                <div class="stat-value" id="severeDays">--</div>
-                <div class="stat-label">Ngày hạn nặng</div>
+                <div class="stat-icon">🌳</div>
+                <div class="stat-value" id="vegAreaPct">--</div>
+                <div class="stat-label">Diện tích có thảm thực vật (%)</div>
             </div>
         </div>
 
         <div class="dashboard">
             <div class="card full-width">
-                <div class="card-title">📈 Biểu đồ TVDI theo thời gian</div>
-                <canvas id="tvdiChart"></canvas>
+                <div class="card-title">📈 NDVI theo thời gian</div>
+                <canvas id="ndviChart"></canvas>
                 <div class="legend">
-                    <div class="legend-item"><div class="legend-color" style="background:#2166ac"></div>Ẩm (< 0.2)</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#67a9cf"></div>Bình thường (0.2-0.4)</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#fddbc7"></div>Hạn nhẹ (0.4-0.6)</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#ef8a62"></div>Hạn nặng (0.6-0.8)</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#b2182b"></div>Hạn cực đoan (> 0.8)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#0571b0"></div>Nước / Không thực vật (&lt; 0)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#ca0020"></div>Đất trống (0 - 0.1)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#f4a582"></div>Thực vật thưa (0.1 - 0.2)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#92c5de"></div>Thực vật vừa (0.2 - 0.4)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#4dac26"></div>Thực vật dày (0.4 - 0.6)</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#1b7837"></div>Thực vật rất dày (&gt; 0.6)</div>
                 </div>
             </div>
 
             <div class="card">
-                <div class="card-title">📊 Thống kê theo tháng</div>
+                <div class="card-title">📊 Thống kê NDVI theo tháng</div>
                 <canvas id="monthlyChart"></canvas>
             </div>
 
             <div class="card">
-                <div class="card-title">🔥 Phân loại hạn hán</div>
+                <div class="card-title">🌿 Phân bố lớp NDVI</div>
                 <canvas id="classChart"></canvas>
             </div>
         </div>
@@ -387,10 +389,10 @@
     <!-- Modal Fetch từ GEE -->
     <div id="fetchModal" class="modal">
         <div class="modal-content">
-            <div class="modal-title">🌍 Tải dữ liệu TVDI từ Google Earth Engine</div>
+            <div class="modal-title">🌍 Tải dữ liệu NDVI từ Google Earth Engine</div>
             <div class="modal-body">
                 <p style="color: rgba(255,255,255,0.7); margin-bottom: 15px;">
-                    🔥 Tải dữ liệu TVDI (LST & NDVI) từ MODIS cho khoảng thời gian đã chọn
+                    🌱 Tải dữ liệu NDVI cho khoảng thời gian đã chọn (MODIS / Sentinel)
                 </p>
                 <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <div style="margin-bottom: 8px;">
@@ -400,7 +402,7 @@
                         <strong>📅 Thời gian:</strong> <span id="modalPeriod">--</span>
                     </div>
                     <div>
-                        <strong>📊 Dữ liệu:</strong> TVDI (MODIS LST & NDVI)
+                        <strong>📊 Dữ liệu:</strong> NDVI (Mean, Min, Max, Vegetation Area %)
                     </div>
                 </div>
 
@@ -452,7 +454,6 @@
             }
         }
 
-        // Mở modal
         function openFetchModal() {
             if (!geeOnline) {
                 alert('GEE Service chưa sẵn sàng. Vui lòng chạy: python api_server.py');
@@ -484,7 +485,6 @@
             const start_date = document.getElementById('startDate').value;
             const end_date = document.getElementById('endDate').value;
 
-            // Show progress
             document.getElementById('fetchProgress').style.display = 'block';
             document.getElementById('btnStartFetch').disabled = true;
             
@@ -496,7 +496,7 @@
             progressFill.textContent = '10%';
 
             try {
-                logEl.innerHTML += '<div class="log-item">🌍 Đang truy vấn dữ liệu MODIS...</div>';
+                logEl.innerHTML += '<div class="log-item">🌍 Đang truy vấn dữ liệu NDVI...</div>';
                 progressFill.style.width = '30%';
                 progressFill.textContent = '30%';
 
@@ -508,7 +508,7 @@
                         location_id: parseInt(location_id),
                         start_date,
                         end_date,
-                        data_types: ['tvdi']
+                        data_types: ['ndvi']
                     })
                 });
 
@@ -522,10 +522,10 @@
                     progressFill.style.width = '100%';
                     progressFill.textContent = '100%';
                     
-                    const records = result.results.tvdi?.records || 0;
+                    const records = result.results.ndvi?.records || 0;
                     logEl.innerHTML = `
                         <div class="log-item">✅ Hoàn thành!</div>
-                        <div class="log-item">📊 Đã tải: ${records} bản ghi TVDI</div>
+                        <div class="log-item">📊 Đã tải: ${records} bản ghi NDVI</div>
                         <div class="log-item">📍 Khu vực: ${result.province}</div>
                         <div class="log-item">📅 Thời gian: ${result.period}</div>
                     `;
@@ -559,88 +559,79 @@
 
             try {
                 const [daily, monthly] = await Promise.all([
-                    fetch(`${API}/tvdi?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
-                    fetch(`${API}/tvdi/monthly?location_id=${locId}&year=${year}`).then(r=>r.json())
+                    fetch(`${API}/ndvi?location_id=${locId}&start=${start}&end=${end}`).then(r=>r.json()),
+                    fetch(`${API}/ndvi/monthly?location_id=${locId}&year=${year}`).then(r=>r.json())
                 ]);
 
                 updateStats(daily.statistics);
                 updateAlert(daily.statistics);
-                drawTvdiChart(daily.data);
+                drawNdviChart(daily.data);
                 drawMonthlyChart(monthly.monthly_data);
                 drawClassChart(daily.data);
 
             } catch (err) {
                 console.error('Error:', err);
-                alert('Lỗi khi tải dữ liệu. Có thể chưa có dữ liệu cho khoảng thời gian này.');
+                alert('Lỗi khi tải dữ liệu NDVI. Có thể chưa có dữ liệu cho khoảng thời gian này.');
             }
         }
 
         function updateStats(stats) {
-            document.getElementById('avgTvdi').textContent = stats.average;
-            document.getElementById('avgLst').textContent = stats.avg_lst + '°';
-            document.getElementById('droughtPct').textContent = stats.drought_pct + '%';
-            document.getElementById('severeDays').textContent = stats.drought_days;
+            document.getElementById('avgNdvi').textContent = stats.average;
+            document.getElementById('minNdvi').textContent = stats.min_ndvi;
+            document.getElementById('maxNdvi').textContent = stats.max_ndvi;
+            document.getElementById('vegAreaPct').textContent = stats.avg_veg_pct + '%';
+        }
+
+        function classifyNdvi(value) {
+            const v = parseFloat(value);
+            if (isNaN(v)) return { level: 'unknown', label: 'Không có dữ liệu', color: '#999', css: '' };
+            if (v < 0) return { level: 'water', label: 'Nước / Không thực vật', color: '#0571b0', css: 'level-water' };
+            if (v < 0.1) return { level: 'bare', label: 'Đất trống', color: '#ca0020', css: 'level-bare' };
+            if (v < 0.2) return { level: 'sparse', label: 'Thực vật thưa', color: '#f4a582', css: 'level-sparse' };
+            if (v < 0.4) return { level: 'moderate', label: 'Thực vật vừa', color: '#92c5de', css: 'level-moderate' };
+            if (v < 0.6) return { level: 'dense', label: 'Thực vật dày', color: '#4dac26', css: 'level-dense' };
+            return { level: 'very_dense', label: 'Thực vật rất dày', color: '#1b7837', css: 'level-very-dense' };
         }
 
         function updateAlert(stats) {
-            const tvdi = parseFloat(stats.average);
-            let level, levelClass, desc;
-            
-            if (tvdi < 0.2) {
-                level = 'ẨM ƯỚT';
-                levelClass = 'level-wet';
-                desc = 'Điều kiện ẩm ướt, không có nguy cơ hạn hán';
-            } else if (tvdi < 0.4) {
-                level = 'BÌNH THƯỜNG';
-                levelClass = 'level-normal';
-                desc = 'Điều kiện thời tiết bình thường';
-            } else if (tvdi < 0.6) {
-                level = 'HẠN NHẸ';
-                levelClass = 'level-moderate';
-                desc = 'Cần theo dõi sát sao, có thể ảnh hưởng đến cây trồng';
-            } else if (tvdi < 0.8) {
-                level = 'HẠN NẶNG';
-                levelClass = 'level-severe';
-                desc = 'Cảnh báo nghiêm trọng! Cần có biện pháp ứng phó ngay';
-            } else {
-                level = 'HẠN CỰC ĐOAN';
-                levelClass = 'level-extreme';
-                desc = 'Tình trạng khẩn cấp! Thiệt hại nghiêm trọng cho nông nghiệp';
-            }
+            const ndvi = parseFloat(stats.average);
+            const cls = classifyNdvi(ndvi);
 
             document.getElementById('alertBanner').style.display = 'block';
-            const levelEl = document.getElementById('droughtLevel');
-            levelEl.textContent = level;
-            levelEl.className = 'drought-level ' + levelClass;
-            document.getElementById('droughtDesc').textContent = desc;
+            const levelEl = document.getElementById('vegLevel');
+            levelEl.textContent = cls.label.toUpperCase();
+            levelEl.className = 'veg-level ' + cls.css;
+
+            let desc = '';
+            if (cls.level === 'water') desc = 'Khu vực chủ yếu là mặt nước hoặc không có thảm thực vật.';
+            else if (cls.level === 'bare') desc = 'Thảm thực vật rất ít, khu vực có nguy cơ xói mòn, suy thoái đất.';
+            else if (cls.level === 'sparse') desc = 'Thảm thực vật thưa, cần theo dõi sự thay đổi theo thời gian.';
+            else if (cls.level === 'moderate') desc = 'Thảm thực vật ở mức trung bình, phù hợp cho canh tác nhưng vẫn cần quản lý tốt.';
+            else if (cls.level === 'dense') desc = 'Thảm thực vật dày, hệ sinh thái khỏe mạnh.';
+            else if (cls.level === 'very_dense') desc = 'Thảm thực vật rất dày, khu vực rừng tốt hoặc sinh khối cao.';
+
+            document.getElementById('vegDesc').textContent = desc;
         }
 
-        function drawTvdiChart(data) {
-            const ctx = document.getElementById('tvdiChart');
-            if (charts.tvdi) charts.tvdi.destroy();
+        function drawNdviChart(data) {
+            const ctx = document.getElementById('ndviChart');
+            if (charts.ndvi) charts.ndvi.destroy();
 
-            const backgroundColors = data.map(d => {
-                const val = parseFloat(d.tvdi_mean);
-                if (val < 0.2) return '#2166ac';
-                if (val < 0.4) return '#67a9cf';
-                if (val < 0.6) return '#fddbc7';
-                if (val < 0.8) return '#ef8a62';
-                return '#b2182b';
-            });
+            const pointColors = data.map(d => classifyNdvi(d.ndvi_mean).color);
 
-            charts.tvdi = new Chart(ctx, {
+            charts.ndvi = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: data.map(d => d.date),
                     datasets: [{
-                        label: 'TVDI',
-                        data: data.map(d => d.tvdi_mean),
-                        borderColor: '#ff8c42',
-                        backgroundColor: 'rgba(255,140,66,0.1)',
+                        label: 'NDVI trung bình',
+                        data: data.map(d => d.ndvi_mean),
+                        borderColor: '#00ff88',
+                        backgroundColor: 'rgba(0,255,136,0.1)',
                         fill: true,
                         tension: 0.4,
-                        pointBackgroundColor: backgroundColors,
-                        pointBorderColor: backgroundColors,
+                        pointBackgroundColor: pointColors,
+                        pointBorderColor: pointColors,
                         pointRadius: 3
                     }]
                 },
@@ -657,7 +648,7 @@
                         y: { 
                             ticks: { color: '#999' },
                             grid: { color: 'rgba(255,255,255,0.1)' },
-                            min: 0,
+                            min: -0.2,
                             max: 1
                         }
                     }
@@ -675,18 +666,22 @@
                 type: 'bar',
                 data: {
                     labels: data.map(d => monthNames[d.month - 1]),
-                    datasets: [{
-                        label: 'TVDI TB',
-                        data: data.map(d => d.avg_tvdi),
-                        backgroundColor: data.map(d => {
-                            const val = parseFloat(d.avg_tvdi);
-                            if (val < 0.2) return '#2166ac';
-                            if (val < 0.4) return '#67a9cf';
-                            if (val < 0.6) return '#fddbc7';
-                            if (val < 0.8) return '#ef8a62';
-                            return '#b2182b';
-                        })
-                    }]
+                    datasets: [
+                        {
+                            label: 'NDVI TB',
+                            data: data.map(d => d.avg_ndvi),
+                            backgroundColor: data.map(d => classifyNdvi(d.avg_ndvi).color)
+                        },
+                        {
+                            label: 'Diện tích có thảm thực vật (%)',
+                            data: data.map(d => d.avg_veg_pct),
+                            type: 'line',
+                            yAxisID: 'y1',
+                            borderColor: '#00d9ff',
+                            backgroundColor: 'rgba(0,217,255,0.1)',
+                            tension: 0.3
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
@@ -696,8 +691,15 @@
                         y: { 
                             ticks: { color: '#999' },
                             grid: { color: 'rgba(255,255,255,0.1)' },
-                            min: 0,
+                            min: -0.2,
                             max: 1
+                        },
+                        y1: {
+                            position: 'right',
+                            ticks: { color: '#00d9ff', callback: v=>v+'%' },
+                            grid: { display: false },
+                            min: 0,
+                            max: 100
                         }
                     }
                 }
@@ -708,23 +710,33 @@
             const ctx = document.getElementById('classChart');
             if (charts.class) charts.class.destroy();
 
-            const classes = { wet: 0, normal: 0, moderate: 0, severe: 0, extreme: 0 };
+            const classes = { water: 0, bare: 0, sparse: 0, moderate: 0, dense: 0, very_dense: 0 };
             data.forEach(d => {
-                const val = parseFloat(d.tvdi_mean);
-                if (val < 0.2) classes.wet++;
-                else if (val < 0.4) classes.normal++;
-                else if (val < 0.6) classes.moderate++;
-                else if (val < 0.8) classes.severe++;
-                else classes.extreme++;
+                const c = classifyNdvi(d.ndvi_mean).level;
+                if (classes[c] !== undefined) classes[c]++;
             });
 
             charts.class = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Ẩm ướt', 'Bình thường', 'Hạn nhẹ', 'Hạn nặng', 'Hạn cực đoan'],
+                    labels: [
+                        'Nước / Không thực vật',
+                        'Đất trống',
+                        'Thực vật thưa',
+                        'Thực vật vừa',
+                        'Thực vật dày',
+                        'Thực vật rất dày'
+                    ],
                     datasets: [{
-                        data: [classes.wet, classes.normal, classes.moderate, classes.severe, classes.extreme],
-                        backgroundColor: ['#2166ac', '#67a9cf', '#fddbc7', '#ef8a62', '#b2182b']
+                        data: [
+                            classes.water,
+                            classes.bare,
+                            classes.sparse,
+                            classes.moderate,
+                            classes.dense,
+                            classes.very_dense
+                        ],
+                        backgroundColor: ['#0571b0', '#ca0020', '#f4a582', '#92c5de', '#4dac26', '#1b7837']
                     }]
                 },
                 options: {
@@ -752,7 +764,6 @@
             }
         }
 
-        // Init
         window.onload = () => {
             loadLocations();
             checkGEEStatus();
@@ -761,3 +772,12 @@
     </script>
 </body>
 </html>
+ 
+
+
+
+
+
+
+
+

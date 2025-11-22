@@ -71,6 +71,26 @@
         }
         .page-subtitle { color: rgba(255,255,255,0.7); }
 
+        .gee-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            margin-top: 15px;
+        }
+        .gee-status.online {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+            color: #4caf50;
+        }
+        .gee-status.offline {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            color: #f44336;
+        }
+
         .controls {
             background: rgba(255,255,255,0.05);
             padding: 20px;
@@ -102,9 +122,81 @@
             background: linear-gradient(135deg, #ff6b6b, #ee5a6f); 
             color: #fff;
         }
-        .btn-primary:hover { 
+        .btn-secondary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        button:hover { 
             transform: translateY(-2px); 
             box-shadow: 0 5px 20px rgba(255,107,107,0.4); 
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: #1a1a2e;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            border: 2px solid #ff6b6b;
+        }
+        .modal-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #ff6b6b;
+        }
+        .modal-body { margin-bottom: 20px; }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ee5a6f);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .log {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            margin-top: 15px;
+        }
+        .log-item {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
 
         .stats-grid {
@@ -166,6 +258,9 @@
         <div class="page-header">
             <div class="page-title">🌡️ Phân tích Nhiệt độ</div>
             <p class="page-subtitle">Dữ liệu từ ERA5 (ECMWF Reanalysis v5)</p>
+            <div id="geeStatus" class="gee-status offline">
+                ⏳ Đang kiểm tra GEE service...
+            </div>
         </div>
 
         <div class="controls">
@@ -173,7 +268,7 @@
                 <div class="form-group">
                     <label>📍 Địa điểm</label>
                     <select id="location">
-                        <option value="1">Quảng Trị</option>
+                        <option value="1" data-province="Quang Tri">Quảng Trị</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -184,7 +279,12 @@
                     <label>📅 Đến ngày</label>
                     <input type="date" id="endDate" value="2020-12-31">
                 </div>
-                <button class="btn-primary" onclick="loadData()">🔍 Phân tích</button>
+                <button class="btn-secondary" onclick="openFetchModal()" id="btnFetch">
+                    🌍 Tải từ GEE
+                </button>
+                <button class="btn-primary" onclick="loadData()">
+                    🔍 Phân tích
+                </button>
             </div>
         </div>
 
@@ -229,9 +329,172 @@
         </div>
     </div>
 
+    <!-- Modal Fetch từ GEE -->
+    <div id="fetchModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">🌍 Tải dữ liệu Nhiệt độ từ Google Earth Engine</div>
+            <div class="modal-body">
+                <p style="color: rgba(255,255,255,0.7); margin-bottom: 15px;">
+                    🌡️ Tải dữ liệu nhiệt độ từ ERA5 cho khoảng thời gian đã chọn
+                </p>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="margin-bottom: 8px;">
+                        <strong>📍 Địa điểm:</strong> <span id="modalLocation">--</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <strong>📅 Thời gian:</strong> <span id="modalPeriod">--</span>
+                    </div>
+                    <div>
+                        <strong>📊 Dữ liệu:</strong> Nhiệt độ (ERA5)
+                    </div>
+                </div>
+
+                <div id="fetchProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill">0%</div>
+                    </div>
+                    <div class="log" id="fetchLog"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeFetchModal()">Hủy</button>
+                <button class="btn-primary" onclick="fetchFromGEE()" id="btnStartFetch">
+                    🚀 Bắt đầu tải
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API = 'http://localhost:3000/api';
         let charts = {};
+        let geeOnline = false;
+
+        // Kiểm tra GEE service
+        async function checkGEEStatus() {
+            try {
+                const res = await fetch(`${API}/gee/status`);
+                const data = await res.json();
+                
+                const statusEl = document.getElementById('geeStatus');
+                if (data.status === 'online' && data.gee_initialized) {
+                    statusEl.className = 'gee-status online';
+                    statusEl.innerHTML = '✅ GEE Service: Online - Sẵn sàng tải dữ liệu';
+                    geeOnline = true;
+                    document.getElementById('btnFetch').disabled = false;
+                } else {
+                    statusEl.className = 'gee-status offline';
+                    statusEl.innerHTML = '❌ GEE Service: Offline - Vui lòng chạy: python api_server.py';
+                    geeOnline = false;
+                    document.getElementById('btnFetch').disabled = true;
+                }
+            } catch (err) {
+                const statusEl = document.getElementById('geeStatus');
+                statusEl.className = 'gee-status offline';
+                statusEl.innerHTML = '❌ GEE Service: Không kết nối được - Chạy: python api_server.py';
+                geeOnline = false;
+                document.getElementById('btnFetch').disabled = true;
+            }
+        }
+
+        // Mở modal
+        function openFetchModal() {
+            if (!geeOnline) {
+                alert('GEE Service chưa sẵn sàng. Vui lòng chạy: python api_server.py');
+                return;
+            }
+            
+            const locationEl = document.getElementById('location');
+            const locationName = locationEl.options[locationEl.selectedIndex].text;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            document.getElementById('modalLocation').textContent = locationName;
+            document.getElementById('modalPeriod').textContent = `${start} đến ${end}`;
+            document.getElementById('fetchModal').classList.add('show');
+        }
+
+        function closeFetchModal() {
+            document.getElementById('fetchModal').classList.remove('show');
+            document.getElementById('fetchProgress').style.display = 'none';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('fetchLog').innerHTML = '';
+        }
+
+        // Tải dữ liệu từ GEE
+        async function fetchFromGEE() {
+            const locationEl = document.getElementById('location');
+            const location_id = locationEl.value;
+            const province = locationEl.options[locationEl.selectedIndex].dataset.province;
+            const start_date = document.getElementById('startDate').value;
+            const end_date = document.getElementById('endDate').value;
+
+            // Show progress
+            document.getElementById('fetchProgress').style.display = 'block';
+            document.getElementById('btnStartFetch').disabled = true;
+            
+            const logEl = document.getElementById('fetchLog');
+            const progressFill = document.getElementById('progressFill');
+            
+            logEl.innerHTML = '<div class="log-item">⏳ Đang kết nối với GEE...</div>';
+            progressFill.style.width = '10%';
+            progressFill.textContent = '10%';
+
+            try {
+                logEl.innerHTML += '<div class="log-item">🌍 Đang truy vấn dữ liệu ERA5...</div>';
+                progressFill.style.width = '30%';
+                progressFill.textContent = '30%';
+
+                const response = await fetch(`${API}/gee/fetch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        province,
+                        location_id: parseInt(location_id),
+                        start_date,
+                        end_date,
+                        data_types: ['temperature']
+                    })
+                });
+
+                progressFill.style.width = '60%';
+                progressFill.textContent = '60%';
+                logEl.innerHTML += '<div class="log-item">💾 Đang lưu vào database...</div>';
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = '100%';
+                    
+                    const records = result.results.temperature?.records || 0;
+                    logEl.innerHTML = `
+                        <div class="log-item">✅ Hoàn thành!</div>
+                        <div class="log-item">📊 Đã tải: ${records} bản ghi nhiệt độ</div>
+                        <div class="log-item">📍 Khu vực: ${result.province}</div>
+                        <div class="log-item">📅 Thời gian: ${result.period}</div>
+                    `;
+
+                    setTimeout(() => {
+                        closeFetchModal();
+                        loadData();
+                    }, 2000);
+                } else {
+                    throw new Error(result.error || result.message || 'Unknown error');
+                }
+
+            } catch (err) {
+                progressFill.style.width = '0%';
+                progressFill.textContent = '0%';
+                logEl.innerHTML = `<div class="log-item" style="color: #f44336;">❌ Lỗi: ${err.message}</div>`;
+                
+                if (err.message.includes('ECONNREFUSED')) {
+                    logEl.innerHTML += '<div class="log-item" style="color: #ffa726;">⚠️ Python API không chạy. Vui lòng chạy: python api_server.py</div>';
+                }
+            } finally {
+                document.getElementById('btnStartFetch').disabled = false;
+            }
+        }
 
         async function loadData() {
             const locId = document.getElementById('location').value;
@@ -252,7 +515,7 @@
 
             } catch (err) {
                 console.error('Error:', err);
-                alert('Lỗi khi tải dữ liệu');
+                alert('Lỗi khi tải dữ liệu. Có thể chưa có dữ liệu cho khoảng thời gian này.');
             }
         }
 
@@ -393,11 +656,20 @@
                 const res = await fetch(`${API}/locations`);
                 const data = await res.json();
                 const sel = document.getElementById('location');
-                sel.innerHTML = data.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-            } catch (e) { console.log('Using default location'); }
+                sel.innerHTML = data.map(l => 
+                    `<option value="${l.id}" data-province="${l.province}">${l.name}</option>`
+                ).join('');
+            } catch (e) { 
+                console.log('Using default location'); 
+            }
         }
 
-        window.onload = () => { loadLocations(); };
+        // Init
+        window.onload = () => {
+            loadLocations();
+            checkGEEStatus();
+            setInterval(checkGEEStatus, 30000);
+        };
     </script>
 </body>
 </html>
